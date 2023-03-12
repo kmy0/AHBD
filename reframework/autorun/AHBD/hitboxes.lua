@@ -4,87 +4,66 @@ local config
 local data
 local misc
 local drawing
+local utilities
 
-local valid_shapes = {1,2,3,4,5}
-local valid_custom_shapes = {0,1,4}
-local char_objects = {}
 local rsc_controllers = {}
 local attacks = {}
 local attacks_cache = {}
-local max_garbage = 30
-local garbage_count = 0
-hitboxes.dummy_shapes = {}
+local dummy_shapes = {}
 
-
-local function get_parent_data(char_type,char_base)
-    local char = {}
-    if char_type == 0 then      --player
-        char.player = true
-        char.id = char_base:getPlayerIndex()
-        char.servant = char_base:checkServant(char.id)
-    elseif char_type == 1 then      --enemy
-        char.enemy = {
-            boss=char_base:get_isBossEnemy()
-        }
-        char.id = char_base:get_EnemyType()
-    elseif char_type == 2 then      --otomo
-        char.otomo = true
-        local otomo_quest_param = char_base:get_OtQuestParam()
-        char.id = otomo_quest_param:get_OtomoID()
-        char.servant = char_base:get_IsServantOtomo()
-    elseif char_type == 5 then      --envcreature
-        char.creature = true
-    end
-    return char
-end
 
 local function draw_dummies()
-    for shape, pos in pairs(hitboxes.dummy_shapes) do
+    for shape, pos in pairs(dummy_shapes) do
+
+        if (pos[1] - data.master_player.pos):length() > config.current.draw_distance then
+            goto next
+        end
+
         if shape == 'Sphere' then
-            drawing.sphere(
+            draw.sphere(
                 pos[1],
                 pos[2],
-                config.default.color,
-                config.default.sphere_show_outline,
-                config.default.sphere_show_wireframe
+                config.current.color,
+                config.current.sphere_show_outline
             )
         elseif shape == 'Cylinder' then
             drawing.cylinder(
                 pos[1],
                 pos[2],
                 pos[3],
-                config.default.color,
-                config.slider_data.cylinder_segments[tostring(config.default.cylinder_segments)],
+                config.current.color,
+                config.slider_data.cylinder_segments[tostring(config.current.cylinder_segments)],
                 true,
-                config.default.cylinder_show_outline,
-                config.default.cylinder_show_outline_sides
+                config.current.cylinder_show_outline,
+                config.current.cylinder_show_outline_sides,
+                false
             )
         elseif shape == 'Capsule' then
-            if config.default.hitbox_capsule == 1 then
+            if config.current.hitbox_capsule == 1 then
                 draw.capsule(
                     pos[1],
                     pos[2],
                     pos[3],
-                    config.default.color,
-                    config.default.capsule_show_outline
+                    config.current.color,
+                    true
                 )
             else
                 drawing.capsule(
                     pos[1],
                     pos[2],
                     pos[3],
-                    config.default.color,
-                    config.slider_data.capsule_segments[tostring(config.default.capsule_segments)],
-                    config.default.capsule_show_outline,
-                    config.default.capsule_show_outline_spheres
+                    config.current.color,
+                    config.slider_data.capsule_segments[tostring(config.current.capsule_segments)],
+                    config.current.capsule_show_outline,
+                    config.current.capsule_show_outline_spheres
                 )
             end
         elseif shape == 'Box' then
             drawing.box(
                 pos[1],
                 pos[2],
-                config.default.color,
-                config.default.box_show_outline
+                config.current.color,
+                config.current.box_show_outline
             )
         elseif shape == 'Ring' then
             drawing.ring(
@@ -92,13 +71,33 @@ local function draw_dummies()
                 pos[2],
                 pos[3],
                 pos[4],
-                config.default.color,
-                config.slider_data.ring_segments[tostring(config.default.ring_segments)],
-                config.default.ring_show_outline,
-                config.default.ring_show_outline_sides
+                config.current.color,
+                config.slider_data.ring_segments[tostring(config.current.ring_segments)],
+                config.current.ring_show_outline,
+                config.current.ring_show_outline_sides
             )
         end
+
+        ::next::
     end
+end
+
+function hitboxes.spawn_dummy_shape(shape_name)
+    local shape = misc.table_copy(data.dummy_shapes[shape_name])
+    local player_pos = utilities.get_player_pos()
+    if player_pos then
+        if shape_name == 'Sphere' or shape_name == 'Box' then
+            shape[1] = shape[1] + player_pos
+        else
+            shape[1] = shape[1] + player_pos
+            shape[2] = shape[2] + player_pos
+        end
+        dummy_shapes[shape_name] = shape
+    end
+end
+
+function hitboxes.clear_dummy_shapes()
+    dummy_shapes = {}
 end
 
 function hitboxes.get_attacks(args)
@@ -109,54 +108,62 @@ function hitboxes.get_attacks(args)
 
     if not parent then
         local game_object = rsc_controller:get_GameObject()
-        local char_base = misc.get_component(game_object, 'snow.CharacterBase')
+        local char_base = utilities.get_component(game_object, 'snow.CharacterBase')
 
         if char_base then
-            local char_type = char_base:getCharacterType()
-            if char_type == 4 then      --shell
-                char_base = char_base:get_OwnerObject()
-                char_obj = char_objects[char_base]
+            local char_obj = data.char_objects[char_base]
 
-                if not char_obj then
-                    char_type = char_base:getCharacterType()
-                    char_objects[char_base] = get_parent_data(char_type,char_base)
-                    parent = char_objects[char_base]
+            if not char_obj then
+                local char_type = char_base:getCharacterType()
+                if char_type == 4 then      --shell
+                    char_base = char_base:get_OwnerObject()
+                    char_obj = data.char_objects[char_base]
+
+                    if not char_obj then
+                        char_type = char_base:getCharacterType()
+                        data.char_objects[char_base] = utilities.get_parent_data(char_type,char_base)
+                        parent = data.char_objects[char_base]
+                    else
+                        parent = char_obj
+                    end
                 else
-                    parent = char_obj
+                    data.char_objects[char_base] = utilities.get_parent_data(char_type,char_base)
+                    rsc_controllers[rsc_controller] = data.char_objects[char_base]
+                    parent = data.char_objects[char_base]
                 end
             else
-                char_objects[char_base] = get_parent_data(char_type,char_base)
-                rsc_controllers[rsc_controller] = char_objects[char_base]
-                parent = char_objects[char_base]
+                parent = char_obj
+                rsc_controllers[rsc_controller] = char_obj
             end
         else
             parent = {}
             parent.props = true
+            parent.distance = 0
         end
     end
 
     if (
         parent.player
-        and not config.default.ignore_players
+        and not config.current.ignore_players
         or (
             parent.otomo
-            and not config.default.ignore_otomo
+            and not config.current.ignore_otomo
         ) or (
               parent.enemy
               and (
-                   not config.default.ignore_big_monsters
+                   not config.current.ignore_big_monsters
                    and parent.enemy.boss
                    or (
-                       not config.default.ignore_small_monsters
+                       not config.current.ignore_small_monsters
                        and not parent.enemy.boss
                    )
               )
           ) or (
                 parent.props
-                and not config.default.ignore_props
+                and not config.current.ignore_props
             ) or (
                   parent.creature
-                  and not config.default.ignore_creatures
+                  and not config.current.ignore_creatures
               )
     ) then
         table.insert(attacks,{
@@ -173,38 +180,41 @@ end
 function hitboxes.reset()
     attacks = {}
     rsc_controllers = {}
-    char_objects = {}
+    data.char_objects = {}
     attacks_cache = {}
-    hitboxes.dummy_shapes = {}
+    dummy_shapes = {}
 end
 
 function hitboxes.draw()
-    if config.default.enabled then
+    if config.current.enabled then
         draw_dummies()
 
         for idx, att in pairs(attacks) do
+
+            if att.parent.distance > config.current.draw_distance then
+                attacks[idx] = nil
+                goto continue
+            end
+
             local phase = att.attack_work:get_Phase()
+
             if (
-                not att.remove
-                and (
-                    phase == 3
-                    or att.attack_work:get_reference_count() == 1
-                    or (
-                        att.collidables
-                        and #att.collidables == 0
-                    )
+                phase == 3
+                or att.attack_work:get_reference_count() == 1
+                or (
+                    att.collidables
+                    and #att.collidables == 0
                 )
             ) then
-                garbage_count = garbage_count + 1
-                att.remove = true
+                attacks[idx] = nil
                 goto continue
 
-            elseif phase == 2 and not att.remove then
+            elseif phase == 2 then
                 if not att.collidables then
                     att.collidables = {}
                     local attack_data = {}
 
-                    if not config.default.pause_monitor then
+                    if not config.current.pause_monitor then
 
                         attack_data.id = att.parent.id
                         if not attack_data.id then
@@ -255,7 +265,11 @@ function hitboxes.draw()
                         attack_data.guardable = att.rs_data:get_GuardableType()
                     end
 
-                    if config.default['ignore_' .. attack_data.damage_type_name] then
+                    if attack_data.guardable == 2 and config.current.ignore_unguardable then
+                        goto continue
+                    end
+
+                    if config.current['ignore_' .. attack_data.damage_type_name] then
                         goto continue
                     end
 
@@ -271,7 +285,7 @@ function hitboxes.draw()
                         local windbox = userdata:get_type_definition():is_a("snow.hit.userdata.HitAttackAppendShapeData")
                         local col_data = {
                             col=collidable,
-                            color=config.default.color,
+                            color=config.current.color,
                             type='hitbox'
                         }
 
@@ -296,34 +310,33 @@ function hitboxes.draw()
                             table.insert(attack_data.att_cond_types, att_cond_name)
                         end
 
-                        if config.default['ignore_' .. att_cond_name] then
+                        if config.current['ignore_' .. att_cond_name] then
                             goto next
                         end
 
-                        if windbox and config.default.ignore_windbox then
+                        if windbox and config.current.ignore_windbox then
                             goto next
                         end
 
-                        if frontal and config.default.ignore_conditional_hitbox then
+                        if frontal and config.current.ignore_frontal then
                             goto next
                         end
-
 
                         if custom_shape ~= 0 then
                             shape_name = data.custom_shape_id[tostring(custom_shape)]
                             col_data.custom_shape_type = custom_shape
                             col_data.userdata = userdata
-                            if not misc.table_contains(valid_custom_shapes, custom_shape) then
-                                if not misc.table_contains(config.default.missing_custom_shapes, custom_shape) then
-                                    table.insert(config.default.missing_custom_shapes, custom_shape)
+                            if not misc.table_contains(data.valid_custom_shapes, custom_shape) then
+                                if not misc.table_contains(config.current.missing_custom_shapes, custom_shape) then
+                                    table.insert(config.current.missing_custom_shapes, custom_shape)
                                 end
                             end
                         else
-                            col_data.shape_type = misc.get_shape_type(collidable)
+                            col_data.shape_type = utilities.get_shape_type(collidable)
                             shape_name = data.shape_id[tostring(col_data.shape_type)]
-                            if not misc.table_contains(valid_shapes, col_data.shape_type) then
-                                if not misc.table_contains(config.default.missing_shapes, col_data.shape_type) then
-                                    table.insert(config.default.missing_shapes, col_data.shape_type)
+                            if not misc.table_contains(data.valid_shapes, col_data.shape_type) then
+                                if not misc.table_contains(config.current.missing_shapes, col_data.shape_type) then
+                                    table.insert(config.current.missing_shapes, col_data.shape_type)
                                 end
                             end
                         end
@@ -332,33 +345,37 @@ function hitboxes.draw()
                             attack_data.shape_count = misc.add_count(attack_data.shape_count, shape_name)
                         end
 
-                        if not config.default.use_single_color then
+                        if not config.current.hitbox_use_single_color then
                             if att.parent.prop then
-                                col_data.color = config.default.prop_color
+                                col_data.color = config.current.prop_color
                             elseif att.parent.enemy then
-                                col_data.color = config.default.monster_color
+                                if att.parent.enemy.boss then
+                                    col_data.color = config.current.big_monster_color
+                                else
+                                    col_data.color = config.current.small_monster_color
+                                end
                             elseif att.parent.player then
-                                col_data.color = config.default.player_color
+                                col_data.color = config.current.player_color
                             elseif att.parent.otomo then
-                                col_data.color = config.default.otomo_color
+                                col_data.color = config.current.otomo_color
                             elseif att.parent.creature then
-                                col_data.color = config.default.creature_color
+                                col_data.color = config.current.creature_color
                             end
 
-                            if windbox and config.default.enable_winbox_color then
-                                col_data.color = config.default.windbox_color
+                            if windbox and config.current.enable_windbox_color then
+                                col_data.color = config.current.windbox_color
                             end
 
-                            if frontal and config.default.enable_conditional_hitbox_color then
-                                col_data.color = config.default.conditional_hitbox_color
+                            if frontal and config.current.enable_frontal_color then
+                                col_data.color = config.current.frontal_color
                             end
 
-                            if attack_data.guardable == 2 and config.default.enable_unguardable_color then
-                                col_data.color = config.default.unguardable_color
+                            if attack_data.guardable == 2 and config.current.enable_unguardable_color then
+                                col_data.color = config.current.unguardable_color
                             end
 
-                            if att_cond_name and att_cond_name ~= 'None' and config.default['enable_' .. att_cond_name .. '_color'] then
-                                col_data.color = config.default[att_cond_name .. '_color']
+                            if att_cond_name and att_cond_name ~= 'None' and config.current['enable_' .. att_cond_name .. '_color'] then
+                                col_data.color = config.current[att_cond_name .. '_color']
                             end
                         end
 
@@ -367,7 +384,7 @@ function hitboxes.draw()
                         ::next::
                     end
 
-                    if not config.default.pause_monitor and not attack_data.cache then
+                    if not config.current.pause_monitor and not attack_data.cache then
 
                         attack_data.ele_mod = att.rs_data:get_field('<SubRate>k__BackingField')
                         attack_data.ele_mod = attack_data.ele_mod and attack_data.ele_mod or not attack_data.ele_mod and "None"
@@ -388,7 +405,7 @@ function hitboxes.draw()
 
                         table.insert(data.monitor,1,attack_data)
                         attacks_cache[attack_data.parent .. attack_data.id .. attack_data.name] = attack_data
-                    elseif not config.default.pause_monitor and attack_data.cache then
+                    elseif not config.current.pause_monitor and attack_data.cache then
                         table.insert(data.monitor,1,attack_data)
                     end
 
@@ -396,7 +413,7 @@ function hitboxes.draw()
                         misc.table_remove(
                             data.monitor,
                             function(t, i, j)
-                                if i > config.default.table_size then
+                                if i > config.current.table_size then
                                     return false
                                 else
                                     return true
@@ -412,22 +429,6 @@ function hitboxes.draw()
             end
             ::continue::
         end
-
-        if garbage_count >= max_garbage then
-            misc.table_remove(
-                attacks,
-                function(t, i, j)
-                    if t[i].remove then
-                        return false
-                    else
-                        return true
-                    end
-                end
-            )
-            garbage_count = 0
-        end
-    else
-        hitboxes.reset()
     end
 end
 
@@ -436,6 +437,7 @@ function hitboxes.init()
     data = require("AHBD.data")
     misc = require("AHBD.misc")
     drawing = require("AHBD.drawing")
+    utilities = require("AHBD.utilities")
 end
 
 return hitboxes

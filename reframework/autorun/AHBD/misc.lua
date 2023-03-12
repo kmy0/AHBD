@@ -1,30 +1,5 @@
 local misc = {}
 
-local playman
-
-function misc.get_playman()
-    if not misc.playman then
-        misc.playman = sdk.get_managed_singleton("snow.player.PlayerManager")
-    end
-    return misc.playman
-end
-
-function misc.get_player_pos()
-    if misc.get_playman() then
-        return misc.get_playman():findMasterPlayer():get_Pos()
-    end
-end
-
-function misc.get_component(game_object, type_name)
-    local t = sdk.typeof(type_name)
-
-    if t == nil then
-        return nil
-    end
-
-    return game_object:call("getComponent(System.Type)", t)
-end
-
 function misc.table_remove(t, fn_keep)
     local i, j, n = 1, 1, #t;
     while i <= n do
@@ -84,28 +59,71 @@ function misc.join_table(t)
     return str
 end
 
-function misc.get_camera_up()
-    local camera = sdk.get_primary_camera()
-    if not camera then return end
-
-    local camera_obj = camera:get_GameObject()
-    if not camera_obj then return end
-
-    local camera_transform = camera_obj:get_Transform()
-    if not camera_transform then return end
-
-    local camera_joints = camera_transform:get_Joints()
-    if not camera_joints then return end
-
-    local camera_joint = camera_joints:get_Item(0)
-    if not camera_joint then return end
-
-    return camera_joint:get_Rotation() * Vector3f.new(0, 1, 0)
+function misc.get_nested_table(t, name)
+    if not t[name] then
+        t[name] = {}
+    end
+    return t[name]
 end
 
-function misc.get_shape_type(collidable)
-    local shape = collidable:get_TransformedShape()
-    return shape:get_ShapeType()
+function misc.set_nested_table(t, name, key, value)
+    if not t then t = {} end
+    if not t[name] then
+        t[name] = {}
+    end
+    t[name][key] = value
+    return t
+end
+
+function misc.table_deep_copy(original, copies)
+    copies = copies or {};
+    local original_type = type(original);
+    local copy;
+    if original_type == "table" then
+        if copies[original] then
+            copy = copies[original];
+        else
+            copy = {};
+            copies[original] = copy;
+            for original_key, original_value in next, original, nil do
+                copy[misc.table_deep_copy(original_key, copies)] = misc.table_deep_copy(original_value
+                    ,
+                    copies);
+            end
+            setmetatable(copy,
+                misc.table_deep_copy(getmetatable(original)
+                    , copies));
+        end
+    else -- number, string, boolean, etc
+        copy = original;
+    end
+    return copy;
+end
+
+function misc.table_merge(...)
+    local tables_to_merge = { ... };
+    assert(#tables_to_merge > 1, "There should be at least two tables to merge them");
+
+    for key, table in ipairs(tables_to_merge) do
+        assert(type(table) == "table", string.format("Expected a table as function parameter %d", key));
+    end
+
+    local result = misc.table_deep_copy(tables_to_merge[1]);
+
+    for i = 2, #tables_to_merge do
+        local from = tables_to_merge[i];
+        for key, value in pairs(from) do
+            if type(value) == "table" then
+                result[key] = result[key] or {};
+                assert(type(result[key]) == "table", string.format("Expected a table: '%s'", key));
+                result[key] = misc.table_merge(result[key], value);
+            else
+                result[key] = value;
+            end
+        end
+    end
+
+    return result;
 end
 
 return misc

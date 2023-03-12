@@ -3,6 +3,13 @@ local data = {}
 local config
 local misc
 
+data.master_player = {
+    obj=nil,
+    id=nil,
+    pos=Vector3f.new(0, 0, 0)
+}
+data.valid_shapes = {1, 2, 3, 4, 5}
+data.valid_custom_shapes = {0, 1, 4}
 data.dummy_shapes = {
     Sphere={Vector3f.new(0, 1, 0), 2},
     Cylinder={Vector3f.new(-1, 2, 0), Vector3f.new(3, 1 ,0), 2},
@@ -26,11 +33,16 @@ data.guard_id = {
     [2]='No'
 }
 data.monitor = {}
+data.hurtbox_monitor = {}
 data.sharpness_id = {}
 data.element_id = {}
 data.debuff_id = {}
 data.shape_id = {}
 data.custom_shape_id = {}
+data.char_objects = {}
+data.to_update = {}
+data.updated = {}
+
 
 local function get_fields(type_def, write_to_config, t, write_color, ignore)
     local damage_type_type_def = sdk.find_type_definition(type_def)
@@ -45,11 +57,11 @@ local function get_fields(type_def, write_to_config, t, write_color, ignore)
 
         if name ~= 'Max' and name ~= 'value__' then
             if write_to_config then
-                config['ignore_' .. name] = false
+                config.default['ignore_' .. name] = false
 
                 if write_color then
-                    config[name .. '_color'] = 1020343074
-                    config['enable_' .. name .. '_color'] = true
+                    -- config.default[name .. '_color'] = 1006632960
+                    config.default['enable_' .. name .. '_color'] = true
                 end
 
                 t.names[name] = data

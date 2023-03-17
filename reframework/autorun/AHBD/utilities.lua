@@ -109,6 +109,9 @@ function utilities.get_parent_data(char_type,char_base)
 end
 
 function utilities.update_hitzones(t)
+
+    if next(t.meat) == nil then return end
+
     if not t.hitzones then
         t.hitzones = {}
     end
@@ -173,6 +176,71 @@ function utilities.update_objects()
 
         data.to_update = misc.table_copy(data.updated)
         data.updated = {}
+    end
+end
+
+function utilities.update_collidable(collidable)
+    collidable.enabled = collidable.col:get_Enabled()
+    if collidable.enabled then
+        local shape = collidable.col:get_TransformedShape()
+        if shape then
+            if collidable.shape_type then
+                if collidable.shape_type == 3 or collidable.shape_type == 4 then --Capsule
+
+                    if collidable.shape_type == 4 then --ContinuousCapsule
+                        shape = shape:get_Capsule()
+                        collidable.pos_a = shape:get_StartPosition()
+                        collidable.pos_b = shape:get_EndPosition()
+                    else
+                        collidable.pos_a = shape:get_PosA()
+                        collidable.pos_b = shape:get_PosB()
+                    end
+
+                    collidable.radius = shape:get_Radius()
+                    local center = collidable.pos_a + collidable.pos_b
+                    collidable.pos = Vector3f.new(center.x / 2, center.y / 2, center.z / 2)
+
+                elseif collidable.shape_type == 1 or collidable.shape_type == 2 then --Sphere
+                    if collidable.shape_type == 2 then --ContinuousSphere
+                        shape = shape:get_Sphere()
+                    end
+
+                    collidable.radius = shape:get_Radius()
+                    collidable.pos = shape:get_Center()
+
+                elseif collidable.shape_type == 5 then --Box
+                    local obb = shape:get_Box()
+
+                    collidable.pos = obb:get_Position()
+                    collidable.extent = obb:get_Extent()
+
+                end
+            else
+                if collidable.custom_shape_type == 1 then --Cylinder
+
+                    collidable.pos_a = shape:get_PosA()
+                    collidable.pos_b = shape:get_PosB()
+                    collidable.radius = shape:get_Radius()
+                    local center = collidable.pos_a + collidable.pos_b
+                    collidable.pos = Vector3f.new(center.x / 2, center.y / 2, center.z / 2)
+
+                elseif collidable.custom_shape_type == 4 then --Donut
+
+                    collidable.pos_a = shape:get_PosA()
+                    collidable.pos_b = shape:get_PosB()
+                    collidable.radius = shape:get_Radius()
+                    collidable.ring_radius = collidable.userdata:get_RingRadius()
+                    local center = collidable.pos_a + collidable.pos_b
+                    collidable.pos = Vector3f.new(center.x / 2, center.y / 2, center.z / 2)
+
+                end
+            end
+
+            collidable.distance = (data.master_player.pos - collidable.pos):length()
+            collidable.updated = true
+        else
+            collidable.updated = false
+        end
     end
 end
 

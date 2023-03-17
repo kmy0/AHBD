@@ -6,6 +6,7 @@ local misc
 local utilities
 local data
 
+local enemy_hitzone_status = {}
 local hurtbox_cache = {}
 local cache_cleared = false
 local to_draw = {}
@@ -47,10 +48,13 @@ local function add_collidable(name, col, parent, meat, group, part_group)
         col=col,
         color=config.current.hurtbox_color,
         type='hurtbox',
+        sort=0,
         group=group,
         part_group=part_group,
         name=name,
         meat=meat,
+        pos=Vector3f.new(0, 0, 0),
+        distance=0,
         shape_type=utilities.get_shape_type(col),
         enabled=col:get_Enabled()
     }
@@ -244,7 +248,7 @@ function hurtboxes.reset()
     loading = false
 end
 
-function hurtboxes.draw()
+function hurtboxes.get()
     load_hurtboxes()
     if config.current.enabled_hurtboxes then
         for parent_name, parent_data in pairs(to_draw) do
@@ -272,6 +276,11 @@ function hurtboxes.draw()
             end
 
             for game_object_name, cols in pairs(parent_data) do
+
+                if parent_name == 'bossenemy' or parent_name == 'smallenemy' then
+                    enemy_hitzone_status = {}
+                end
+
                 for idx, col in pairs(cols) do
                     if col.parent.distance > config.current.draw_distance then
                         goto next_game_object
@@ -311,32 +320,46 @@ function hurtboxes.draw()
                         end
 
                         if col.parent.enemy then
-                            for type, conditions in pairs(config.raw_hitzone_conditions) do
-                                if col.parent.hitzones and col.parent.hitzones[tostring(col.meat)] then
-                                    local hitzone = col.parent.hitzones[tostring(col.meat)][tostring(col.part_group)][type]
-                                    for _, cond in pairs(conditions) do
-                                        if hitzone >= cond.from and hitzone <= cond.to then
-                                            if cond.ignore then
-                                                goto next_col
-                                            else
-                                                col.color = cond.color
-                                                goto exit
+                            if enemy_hitzone_status[col.group] then
+                                if enemy_hitzone_status[col.group].ignore then
+                                    goto next_col
+                                elseif enemy_hitzone_status[col.group].color then
+                                    col.color = enemy_hitzone_status[col.group].color
+                                end
+                            else
+                                enemy_hitzone_status[col.group] = {}
+                                for type=1, 8 do
+                                    local conditions = config.raw_hitzone_conditions[type]
+                                    if col.parent.hitzones and col.parent.hitzones[tostring(col.meat)] then
+                                        local hitzone = col.parent.hitzones[tostring(col.meat)][tostring(col.part_group)][type]
+                                        for i=1, #conditions do
+                                            local cond = conditions[i]
+                                            if hitzone >= cond.from and hitzone <= cond.to then
+                                                if cond.ignore then
+                                                    enemy_hitzone_status[col.group].ignore = true
+                                                    goto next_col
+                                                else
+                                                    enemy_hitzone_status[col.group].color = cond.color
+                                                    col.color = cond.color
+                                                    goto exit
+                                                end
                                             end
                                         end
                                     end
                                 end
-                            end
 
-                            ::exit::
+                                ::exit::
+                            end
                         end
                     end
 
-                    drawing.shape(col)
-                    ::next_col::
-                end
+                    utilities.update_collidable(col)
 
-                if data.hurtbox_monitor[game_object_name] then
-                    data.hurtbox_monitor[game_object_name].updated = os.clock()
+                    if col.enabled and col.updated then
+                        table.insert(drawing.cache, col)
+                    end
+
+                    ::next_col::
                 end
 
                 ::next_game_object::

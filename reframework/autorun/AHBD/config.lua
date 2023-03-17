@@ -39,13 +39,13 @@ config.default = {
     table_size=25,
     missing_shapes={},
     missing_custom_shapes={},
-    ignore_none=false,
+    ignore_None=false,
     sphere_show_outline=true,
     cylinder_show_outline=true,
     cylinder_show_outline_sides=true,
     cylinder_segments=12,
-    hitbox_capsule=2,
-    hurtbox_capsule=2,
+    hitbox_capsule=1,
+    hurtbox_capsule=1,
     capsule_show_outline=true,
     capsule_show_outline_spheres=true,
     capsule_segments=12,
@@ -61,15 +61,7 @@ config.default = {
     ignore_hurtbox_players=false,
     ignore_hurtbox_creatures=false,
     enabled_hurtboxes=true,
-    hitzone_conditions={
-        ['1']={
-            color=1009176866,
-            from=45,
-            ignore=false,
-            to=300,
-            type=1
-        }
-    },
+    hitzone_conditions={},
     ignore_unguardable=false,
     hurtbox_highlight_color=1007405917,
     hurtbox_color=1020343074,
@@ -78,10 +70,10 @@ config.default = {
     hurtbox_otomo_color=1020343074,
     hurtbox_master_player_color=1020343074,
     hurtbox_player_color=1020343074,
-    hurtbox_creature_color=1020343074,
+    hurtbox_creature_color=1020343074
 }
 config.current = {}
-config.version = '1.1.0'
+config.version = '1.1.1'
 config.name = 'AHBD'
 config.config_path = config.name .. '/config.json'
 config.hurtbox_cache_path = config.name .. '/hurtbox_cache.json'
@@ -90,6 +82,15 @@ config.outline_color = 4278190080
 config.max_updates = 20
 config.slider_data = {}
 config.raw_hitzone_conditions = {}
+config.default_hitzone_conditions = {
+    ['1']={
+        color=1009176866,
+        from=45,
+        ignore=false,
+        to=300,
+        type=1
+    }
+}
 
 
 function config.write_hitzone_conditions()
@@ -98,14 +99,26 @@ function config.write_hitzone_conditions()
         config.raw_hitzone_conditions[i] = {}
     end
 
-    for _, v in pairs(config.current.hitzone_conditions) do
+    for k, v in pairs(config.current.hitzone_conditions) do
         local t = {
             from=v.from,
             to=v.to,
             color=v.color,
-            ignore=v.ignore
+            ignore=v.ignore,
+            key=tonumber(k)
         }
         table.insert(config.raw_hitzone_conditions[v.type], t)
+    end
+
+    for i=1, 8 do
+        table.sort(
+            config.raw_hitzone_conditions[i],
+            function(x, y)
+                if x.key < y.key then
+                    return true
+                end
+            end
+        )
     end
 end
 
@@ -115,6 +128,7 @@ function config.load()
         config.current = misc.table_merge(config.default, loaded_config)
     else
         config.current = misc.table_deep_copy(config.default)
+        config.current.hitzone_conditions = misc.table_deep_copy(config.default_hitzone_conditions)
     end
 end
 
@@ -124,6 +138,7 @@ end
 
 function config.restore()
     config.current = misc.table_deep_copy(config.default)
+    config.current.hitzone_conditions = misc.table_deep_copy(config.default_hitzone_conditions)
     config.write_hitzone_conditions()
     config.save()
 end

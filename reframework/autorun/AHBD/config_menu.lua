@@ -190,21 +190,27 @@ local function set_color_w_cb(str,key)
 end
 
 local function create_condition()
-    for i=1, 1000 do
-        if config.current.hitzone_conditions[tostring(i)] then
-            goto next
-        else
-            config.current.hitzone_conditions[tostring(i)] = {
-                from=0,
-                to=0,
-                ignore=false,
-                type=1,
-                color=1020343074
-            }
-            return
-        end
-        ::next::
+    local t = {}
+    local key
+    for k, _ in pairs(config.current.hitzone_conditions) do
+        table.insert(t, tonumber(k))
     end
+
+    if #t ~= 0 then
+        table.sort(t)
+        key = tostring(t[#t] + 1)
+    else
+        key = '1'
+    end
+
+    config.current.hitzone_conditions[key] = {
+        from=0,
+        to=0,
+        ignore=false,
+        type=1,
+        color=1020343074
+    }
+    config.write_hitzone_conditions()
 end
 
 local function condition(key)
@@ -367,6 +373,7 @@ local function draw_hurtbox_monitor()
                                 local shape_name = data.shape_id[tostring(v.shape_type)]
                                 shape_count = misc.add_count(shape_count, shape_name)
                             end
+
                             ::next::
                         end
 
@@ -529,7 +536,7 @@ function config_menu.draw()
             if config.current.hitbox_use_single_color then
                 imgui.push_style_var(0,0.4)
             end
-            _, config.current.ignore_none = imgui.checkbox('Ignore None', config.current.ignore_none)
+            _, config.current.ignore_None = imgui.checkbox('Ignore None', config.current.ignore_None)
             _, config.current.ignore_frontal = imgui.checkbox('Ignore Frontal', config.current.ignore_frontal)
 
             for _, k in pairs(data.att_cond_match_hit_attr.sort) do
@@ -628,7 +635,7 @@ function config_menu.draw()
             if imgui.button(spaced('Create Condition', 3)) then
                 create_condition()
             end
-            set_tooltip('Changes color or hides hurtboxes if their hitzone value is in from - to range\nIf conditions overlap, whichever gets hit first will apply', true)
+            set_tooltip('Changes color or hides hurtboxes if their hitzone value is in from - to range\nIf conditions overlap, whichever gets hit first will apply\n\nCheck order: Exactly as displayed in listbox, Slash->Strike->Shell->etc', true)
             imgui.separator()
 
             local sorted = {}
@@ -799,7 +806,7 @@ function config_menu.draw()
     end
 
     if imgui.collapsing_header('Attack Monitor') then
-        set_tooltip('Information about non ignored attacks that where within draw distance')
+        set_tooltip('Information about non ignored attacks that were within draw distance')
         imgui.indent(10)
         imgui.spacing()
 

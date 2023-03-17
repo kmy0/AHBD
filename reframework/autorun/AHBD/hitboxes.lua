@@ -166,7 +166,7 @@ function hitboxes.get_attacks(args)
                   and not config.current.ignore_creatures
               )
     ) then
-        table.insert(attacks,{
+        table.insert(attacks, {
             rsc_controller=rsc_controller,
             parent=parent,
             attack_work=attack_work,
@@ -185,7 +185,7 @@ function hitboxes.reset()
     dummy_shapes = {}
 end
 
-function hitboxes.draw()
+function hitboxes.get()
     if config.current.enabled then
         draw_dummies()
 
@@ -213,6 +213,8 @@ function hitboxes.draw()
                 if not att.collidables then
                     att.collidables = {}
                     local attack_data = {}
+                    local ignore_monitor
+                    local key
 
                     if not config.current.pause_monitor then
 
@@ -247,7 +249,7 @@ function hitboxes.draw()
                             attack_data.parent = 'Creature'
                         end
 
-                        local key = attack_data.parent .. attack_data.id .. attack_data.name
+                        key = attack_data.parent .. attack_data.id .. attack_data.name
                         if attacks_cache[key] then
                             attack_data = attacks_cache[key]
                             attack_data.cache = true
@@ -265,11 +267,14 @@ function hitboxes.draw()
                         attack_data.guardable = att.rs_data:get_GuardableType()
                     end
 
-                    if attack_data.guardable == 2 and config.current.ignore_unguardable then
-                        goto continue
-                    end
-
-                    if config.current['ignore_' .. attack_data.damage_type_name] then
+                    if (
+                        attack_data.guardable == 2
+                        and config.current.ignore_unguardable
+                        or config.current['ignore_' .. attack_data.damage_type_name]
+                    ) then
+                        if key and attacks_cache[key] and not attacks_cache[key].cache then
+                            attacks_cache[key] = nil
+                        end
                         goto continue
                     end
 
@@ -286,7 +291,11 @@ function hitboxes.draw()
                         local col_data = {
                             col=collidable,
                             color=config.current.color,
-                            type='hitbox'
+                            type='hitbox',
+                            pos=Vector3f.new(0, 0 ,0),
+                            distance=0,
+                            sort=0,
+                            att=att
                         }
 
                         if not att_cond then
@@ -310,18 +319,6 @@ function hitboxes.draw()
                             table.insert(attack_data.att_cond_types, att_cond_name)
                         end
 
-                        if config.current['ignore_' .. att_cond_name] then
-                            goto next
-                        end
-
-                        if windbox and config.current.ignore_windbox then
-                            goto next
-                        end
-
-                        if frontal and config.current.ignore_frontal then
-                            goto next
-                        end
-
                         if custom_shape ~= 0 then
                             shape_name = data.custom_shape_id[tostring(custom_shape)]
                             col_data.custom_shape_type = custom_shape
@@ -343,6 +340,20 @@ function hitboxes.draw()
 
                         if not attack_data.cache then
                             attack_data.shape_count = misc.add_count(attack_data.shape_count, shape_name)
+                        end
+
+                        if (
+                            config.current['ignore_' .. att_cond_name]
+                            or (
+                                windbox
+                                and config.current.ignore_windbox
+                            ) or (
+                                  frontal
+                                  and config.current.ignore_frontal
+                              )
+                        ) then
+                            ignore_monitor = true
+                            goto next
                         end
 
                         if not config.current.hitbox_use_single_color then
@@ -380,7 +391,13 @@ function hitboxes.draw()
                         end
 
                         table.insert(att.collidables, col_data)
-                        drawing.shape(col_data)
+
+                        utilities.update_collidable(col_data)
+
+                        if col_data.enabled and col_data.updated then
+                            table.insert(drawing.cache, col_data)
+                        end
+
                         ::next::
                     end
 
@@ -403,10 +420,13 @@ function hitboxes.draw()
                         attack_data.start_delay = att.rs_data._HitStartDelay
                         attack_data.end_delay = att.rs_data._HitStartDelay
 
-                        table.insert(data.monitor,1,attack_data)
-                        attacks_cache[attack_data.parent .. attack_data.id .. attack_data.name] = attack_data
-                    elseif not config.current.pause_monitor and attack_data.cache then
-                        table.insert(data.monitor,1,attack_data)
+                        if not ignore_monitor then
+                            table.insert(data.monitor, 1, attack_data)
+                            attacks_cache[attack_data.parent .. attack_data.id .. attack_data.name] = attack_data
+                        end
+
+                    elseif not config.current.pause_monitor and attack_data.cache and not ignore_monitor then
+                        table.insert(data.monitor, 1, attack_data)
                     end
 
                     if #data.monitor > 2 * config.max_table_size then
@@ -422,11 +442,22 @@ function hitboxes.draw()
                         )
                     end
                 else
+                    local alive = false
                     for _, collidable in pairs(att.collidables) do
-                        drawing.shape(collidable)
+                        utilities.update_collidable(collidable)
+
+                        if collidable.enabled and collidable.updated then
+                            alive = true
+                            table.insert(drawing.cache, collidable)
+                        end
+                    end
+
+                    if not alive then
+                        attacks[idx] = nil
                     end
                 end
             end
+
             ::continue::
         end
     end

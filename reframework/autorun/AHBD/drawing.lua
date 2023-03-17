@@ -9,6 +9,8 @@ local corners = {}
 local prev_corners = {}
 local last_corners = {}
 
+drawing.cache = {}
+
 
 function get_sin(angle)
     if sin_cache[angle] then
@@ -45,7 +47,8 @@ function drawing.box(pos, extent, color, outline)
     corners[7] = Vector3f.new(max.x, min.y, max.z)
     corners[8] = Vector3f.new(max.x, max.y, max.z)
 
-    for i, corner in ipairs(corners) do
+    for i=1, #corners do
+        local corner = corners[i]
         corners[i] = draw.world_to_screen(corner)
         if not corners[i] then
             return
@@ -325,94 +328,105 @@ function drawing.ring(pa, pb, ra, rb, color, segments, outline, outline_sides)
 end
 
 function drawing.shape(collidable)
-    if collidable.col:get_Enabled() then
-        local shape = collidable.col:get_TransformedShape()
-        if shape then
-            if collidable.shape_type then
-                if collidable.shape_type == 3 or collidable.shape_type == 4 then --Capsule
-                    local pos_a
-                    local pos_b
+    if collidable.shape_type then
+        if collidable.shape_type == 3 or collidable.shape_type == 4 then --Capsule
 
-                    if collidable.shape_type == 4 then --ContinuousCapsule
-                        shape = shape:get_Capsule()
-                        pos_a = shape:get_StartPosition()
-                        pos_b = shape:get_EndPosition()
-                    else
-                        pos_a = shape:get_PosA()
-                        pos_b = shape:get_PosB()
-                    end
-
-                    if (
-                        config.current.hitbox_capsule == 1
-                        and collidable.type == 'hitbox'
-                        or (
-                            config.current.hurtbox_capsule == 1
-                            and collidable.type == 'hurtbox')
-                    ) then
-                        draw.capsule(
-                            pos_a,
-                            pos_b,
-                            shape:get_Radius(),
-                            collidable.color,
-                            true
-                        )
-                    else
-                        drawing.capsule(
-                            pos_a,
-                            pos_b,
-                            shape:get_Radius(),
-                            collidable.color,
-                            config.slider_data.capsule_segments[tostring(config.current.capsule_segments)],
-                            config.current.capsule_show_outline,
-                            config.current.capsule_show_outline_spheres
-                        )
-                    end
-                elseif collidable.shape_type == 1 or collidable.shape_type == 2 then --Sphere
-                    if collidable.shape_type == 2 then --ContinuousSphere
-                        shape = shape:get_Sphere()
-                    end
-                    draw.sphere(
-                        shape:get_Center(),
-                        shape:get_Radius(),
-                        collidable.color,
-                        config.current.sphere_show_outline
-                    )
-                elseif collidable.shape_type == 5 then --Box
-                    local obb = shape:get_Box()
-                    drawing.box(
-                        obb:get_Position(),
-                        obb:get_Extent(),
-                        collidable.color,
-                        config.current.box_show_outline
-                    )
-                end
+            if (
+                config.current.hitbox_capsule == 1
+                and collidable.type == 'hitbox'
+                or (
+                    config.current.hurtbox_capsule == 1
+                    and collidable.type == 'hurtbox')
+            ) then
+                draw.capsule(
+                    collidable.pos_a,
+                    collidable.pos_b,
+                    collidable.radius,
+                    collidable.color,
+                    true
+                )
             else
-                if collidable.custom_shape_type == 1 then --Cylinder
-                    drawing.cylinder(
-                        shape:get_PosA(),
-                        shape:get_PosB(),
-                        shape:get_Radius(),
-                        collidable.color,
-                        config.slider_data.cylinder_segments[tostring(config.current.cylinder_segments)],
-                        true,
-                        config.current.cylinder_show_outline,
-                        config.current.cylinder_show_outline_sides
-                    )
-                elseif collidable.custom_shape_type == 4 then --Donut
-                    drawing.ring(
-                        shape:get_PosA(),
-                        shape:get_PosB(),
-                        shape:get_Radius(),
-                        collidable.userdata:get_RingRadius(),
-                        collidable.color,
-                        config.slider_data.ring_segments[tostring(config.current.ring_segments)],
-                        config.current.ring_show_outline,
-                        config.current.ring_show_outline_sides
-                    )
+                drawing.capsule(
+                    collidable.pos_a,
+                    collidable.pos_b,
+                    collidable.radius,
+                    collidable.color,
+                    config.slider_data.capsule_segments[tostring(config.current.capsule_segments)],
+                    config.current.capsule_show_outline,
+                    config.current.capsule_show_outline_spheres
+                )
+            end
+        elseif collidable.shape_type == 1 or collidable.shape_type == 2 then --Sphere
+
+            draw.sphere(
+                collidable.pos,
+                collidable.radius,
+                collidable.color,
+                config.current.sphere_show_outline
+            )
+        elseif collidable.shape_type == 5 then --Box
+
+            drawing.box(
+                collidable.pos,
+                collidable.extent,
+                collidable.color,
+                config.current.box_show_outline
+            )
+        end
+    else
+        if collidable.custom_shape_type == 1 then --Cylinder
+
+            drawing.cylinder(
+                collidable.pos_a,
+                collidable.pos_b,
+                collidable.radius,
+                collidable.color,
+                config.slider_data.cylinder_segments[tostring(config.current.cylinder_segments)],
+                true,
+                config.current.cylinder_show_outline,
+                config.current.cylinder_show_outline_sides
+            )
+        elseif collidable.custom_shape_type == 4 then --Donut
+
+            drawing.ring(
+                collidable.pos_a,
+                collidable.pos_b,
+                collidable.radius,
+                collidable.ring_radius,
+                collidable.color,
+                config.slider_data.ring_segments[tostring(config.current.ring_segments)],
+                config.current.ring_show_outline,
+                config.current.ring_show_outline_sides
+            )
+        end
+    end
+end
+
+function drawing.draw()
+    table.sort(
+        drawing.cache,
+        function(x, y)
+            if x.distance > y.distance then
+                return true
+            elseif x.distance == y.distance then
+                if x.type == 'hurtbox' and y.type == 'hitbox' then
+                    return true
+                elseif x.type == 'hitbox' and y.type == 'hitbox' or x.type == 'hurtbox' and y.type == 'hurtbox' then
+                    if x.sort < y.sort then
+                        return true
+                    end
                 end
             end
         end
+    )
+
+    for i=1, #drawing.cache do
+        local col = drawing.cache[i]
+        col.sort = i
+        drawing.shape(col)
     end
+
+    drawing.cache = {}
 end
 
 function drawing.init()

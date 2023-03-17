@@ -41,8 +41,9 @@ re.on_frame(
 
         if utilities.is_in_quest() then
             utilities.update_objects()
-            hitboxes.draw()
-            hurtboxes.draw()
+            hurtboxes.get()
+            hitboxes.get()
+            drawing.draw()
         else
             hitboxes.reset()
             hurtboxes.reset()

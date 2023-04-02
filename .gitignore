@@ -1,42 +1,32 @@
-# Compiled Lua sources
-luac.out
+# Prerequisites
+*.d
 
-# luarocks build files
-*.src.rock
-*.zip
-*.tar.gz
-
-# Object files
+# Compiled Object files
+*.slo
+*.lo
 *.o
-*.os
-*.ko
 *.obj
-*.elf
 
 # Precompiled Headers
 *.gch
 *.pch
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-*.def
-*.exp
-
-# Shared objects (inc. Windows DLLs)
-*.dll
+# Compiled Dynamic libraries
 *.so
-*.so.*
 *.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
 
 # Executables
 *.exe
 *.out
 *.app
-*.i*86
-*.x86_64
-*.hex
-
-AHDB.7z

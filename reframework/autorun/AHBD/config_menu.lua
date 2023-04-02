@@ -2,8 +2,10 @@ local config_menu = {}
 
 local config
 local data
-local hitboxes
 local misc
+local dummies
+local hurtboxes
+local utilities
 
 config_menu.is_opened = false
 
@@ -70,12 +72,12 @@ local table_ = {
         ['Debuff Modifier']='debuff_mod',
         ['Debuff']='debuff_1',
         ['Debuff Value']='debuff_value',
-        ['Hitbox Count']='col_count',
+        ['Hitbox Count']='col_active_count',
         ['Power']='power',
-        ['Shapes']='shape_count',
-        ['Condition']='condition',
-        ['Frontal Count']='frontal_count',
-        ['Windbox Count']='windbox_count',
+        ['Shapes']='col_shape_count',
+        ['Condition']='col_attack_condition_types',
+        ['Frontal Count']='col_frontal_count',
+        ['Windbox Count']='col_windbox_count',
         ['Guardable']='guardable',
         ['Start Delay']='start_delay',
         ['End Delay']='end_delay',
@@ -118,16 +120,6 @@ local spawn_combo = {
     'Box',
     'Ring'
 }
-local damage_types = {
-    'Slash',
-    'Strike',
-    'Shell',
-    'Fire',
-    'Water',
-    'Ice',
-    'Elect',
-    'Dragon'
-}
 local colors = {
     bad=0xff1947ff,
     good=0xff47ff59,
@@ -163,26 +155,33 @@ local function popup_yesno(str,key)
         imgui.spacing()
         imgui.text(spaced(str, 3 ))
         imgui.spacing()
+
         if imgui.button(spaced('Yes', 3)) then
             imgui.close_current_popup()
             bool = true
         end
+
         imgui.same_line()
+
         if imgui.button(spaced('No', 3)) then
             imgui.close_current_popup()
         end
+
         imgui.spacing()
         imgui.end_popup()
     end
+
     return bool
 end
 
 local function set_color_w_cb(str,key)
     _, config.current['enable_' .. key] = imgui.checkbox('##' .. str, config.current['enable_' .. key])
     imgui.same_line()
+
     if not config.current['enable_' .. key] then
         imgui.push_style_var(0, 0.4)
     end
+
     _, config.current[key] = imgui.color_edit(str, config.current[key])
     if not config.current['enable_' .. key] then
         imgui.pop_style_var()
@@ -210,21 +209,27 @@ local function create_condition()
         type=1,
         color=1020343074
     }
+
     config.write_hitzone_conditions()
 end
 
 local function condition(key)
     local changed
     local save
-    changed, config.current.hitzone_conditions[key].ignore = imgui.checkbox('Ignore Condition '.. key .. '##ignore_'  .. key, config.current.hitzone_conditions[key].ignore)
+
+    changed, config.current.hitzone_conditions[key].ignore = imgui.checkbox(string.format('Ignore Condition %s##ignore_%s', key, key), config.current.hitzone_conditions[key].ignore)
     if changed then save = true end
+
     imgui.same_line()
-    if imgui.button(spaced('Remove', 3)  .. '##remove_'  .. key) then
+
+    if imgui.button(string.format("%s##remove_%s", spaced('Remove', 3), key)) then
         config.current.hitzone_conditions[key] = nil
         config.write_hitzone_conditions()
         return
     end
+
     imgui.push_item_width(200)
+
     changed_s1, config.current.hitzone_conditions[key].from = imgui.slider_int('##from_' .. key, config.current.hitzone_conditions[key].from, 0, 300, 'From ' .. config.current.hitzone_conditions[key].from)
     if changed_s1 then save = true end
 
@@ -233,7 +238,7 @@ local function condition(key)
     end
 
     imgui.same_line()
-    changed_s2, config.current.hitzone_conditions[key].to = imgui.slider_int('##to_'  .. key, config.current.hitzone_conditions[key].to, 0, 300, 'To ' .. config.current.hitzone_conditions[key].to)
+    changed_s2, config.current.hitzone_conditions[key].to = imgui.slider_int('##to_' .. key, config.current.hitzone_conditions[key].to, 0, 300, 'To ' .. config.current.hitzone_conditions[key].to)
     if changed_s2 then save = true end
 
     if changed_s2 and config.current.hitzone_conditions[key].to < config.current.hitzone_conditions[key].from  then
@@ -241,14 +246,18 @@ local function condition(key)
     end
 
     imgui.same_line()
-    changed, config.current.hitzone_conditions[key].type = imgui.combo('##combo_'  .. key, config.current.hitzone_conditions[key].type, damage_types)
+    changed, config.current.hitzone_conditions[key].type = imgui.combo('##combo_' .. key, config.current.hitzone_conditions[key].type, data.damage_elements)
     if changed then save = true end
+
     imgui.pop_item_width()
     imgui.push_item_width(616)
+
     changed, config.current.hitzone_conditions[key].color = imgui.color_edit('##color' .. key, config.current.hitzone_conditions[key].color)
     if changed then save = true end
+
     imgui.pop_item_width()
     imgui.separator()
+
     if save then
         config.write_hitzone_conditions()
     end
@@ -271,7 +280,7 @@ local function draw_attack_monitor()
     imgui.spacing()
 
     if imgui.begin_table(table_.name, table_.col_count, table_.flags)then
-        local header = nil
+        local header
         local end_ = config.current.table_size
 
         if end_ > #data.monitor then
@@ -300,7 +309,17 @@ local function draw_attack_monitor()
                         imgui.push_font(window.font)
                     end
 
-                    imgui.text(data.monitor[row+1][table_.header_to_key[header]])
+                    local key = table_.header_to_key[header]
+                    local value
+
+                    if misc.starts_with(key, 'col_') then
+                        key = string.gsub(key, 'col_', '')
+                        value = data.monitor[row+1][2][key]
+                    else
+                        value = data.monitor[row+1][1][key]
+                    end
+
+                    imgui.text(value)
 
                     if header == 'Attack Name' then
                         imgui.pop_font()
@@ -308,6 +327,7 @@ local function draw_attack_monitor()
                 end
             end
         end
+
         imgui.end_table()
     end
 end
@@ -319,7 +339,9 @@ local function draw_hurtbox_monitor()
         for k, _ in pairs(t) do
             table.insert(sorted, k)
         end
+
         table.sort(sorted, function(x, y) if x < y then return true else return false end end)
+
         return sorted
     end
 
@@ -329,7 +351,7 @@ local function draw_hurtbox_monitor()
             local monster = data.hurtbox_monitor[game_object_name]
             local in_draw_distance = monster.parent.distance < config.current.draw_distance
 
-            if imgui.tree_node(monster.real_name .. '##' .. game_object_name) then
+            if imgui.tree_node(string.format("%s##%s", monster.real_name, game_object_name)) then
                 imgui.spacing()
 
                 set_pos(5)
@@ -368,10 +390,10 @@ local function draw_hurtbox_monitor()
                                 collidables[i] = nil
                                 goto next
                             end
+
                             if v.enabled then
                                 count = count + 1
-                                local shape_name = data.shape_id[tostring(v.shape_type)]
-                                shape_count = misc.add_count(shape_count, shape_name)
+                                shape_count = misc.add_count(shape_count, data.shape_id[tostring(v.info.shape_type)])
                             end
 
                             ::next::
@@ -379,11 +401,10 @@ local function draw_hurtbox_monitor()
 
                         if count > 0 then
                             imgui.table_next_row()
-
                             part_count = part_count + 1
 
                             group.hitzones = {}
-                            if parent.hitzones[tostring(group.meat)] then
+                            if parent.hitzones and parent.hitzones[tostring(group.meat)] then
                                 for hitzone, value in ipairs(parent.hitzones[tostring(group.meat)][tostring(group.part_group)]) do
                                     group.hitzones[hitzone] = value
                                 end
@@ -400,27 +421,32 @@ local function draw_hurtbox_monitor()
                                     imgui.pop_font()
                                 elseif header == 'Visible' then
                                     imgui.spacing()
+
                                     if not group.visible then
-                                        if imgui.button(spaced('No', 3) .. '##1' .. game_object_name .. row) then
+
+                                        if imgui.button(string.format("%s##1%s%s", spaced('No', 3), game_object_name, row)) then
                                            group.visible = true
                                         end
                                     else
-                                        if imgui.button(spaced('Yes', 3) .. '##1' .. game_object_name .. row) then
+                                        if imgui.button(string.format("%s##1%s%s", spaced('Yes', 3), game_object_name, row)) then
                                             group.visible = false
                                         end
                                     end
+
                                     imgui.spacing()
                                 elseif header == 'Highlight' then
                                     imgui.spacing()
+
                                     if not group.highlight then
-                                        if imgui.button(spaced('No', 3) .. '##2' .. game_object_name .. row) then
+                                        if imgui.button(string.format("%s##2%s%s", spaced('No', 3), game_object_name, row)) then
                                             group.highlight = true
                                         end
                                     else
-                                        if imgui.button(spaced('Yes', 3) .. '##2' .. game_object_name .. row) then
+                                        if imgui.button(string.format("%s##2%s%s", spaced('Yes', 3), game_object_name, row)) then
                                             group.highlight = false
                                         end
                                     end
+
                                     imgui.spacing()
                                 elseif header == 'Hurtbox Count' then
                                     imgui.text(count)
@@ -439,6 +465,7 @@ local function draw_hurtbox_monitor()
 
                     imgui.end_table()
                 end
+
                 imgui.tree_pop()
             end
         end
@@ -455,7 +482,7 @@ function config_menu.draw()
     imgui.push_style_var(11, 5.0) -- Rounded elements
     imgui.push_style_var(2, 10.0) -- Window Padding
 
-    config_menu.is_opened = imgui.begin_window(config.name .. " " .. config.version, config_menu.is_opened , window.flags)
+    config_menu.is_opened = imgui.begin_window(string.format("%s %s", config.name, config.version), config_menu.is_opened , window.flags)
 
     if not config_menu.is_opened then
         imgui.pop_style_var(2)
@@ -467,20 +494,23 @@ function config_menu.draw()
     imgui.spacing()
     imgui.indent(10)
 
-    local string_1 = table.concat(config.current.missing_shapes, ", ")
-    local string_2 = table.concat(config.current.missing_custom_shapes, ", ")
-    if string_1 ~= '' then
-        imgui.text('Missing Shape Types: ' .. string_)
-    end
-    if string_2 ~= '' then
-        imgui.text('Missing Custom Shape Types: ' .. string_)
-    end
-    if string_1 ~= '' or string_2 ~= '' then
-        set_tooltip('If you see this please leave a comment on Nexus with the numbers so I can add missing shapes')
+    -- local string_1 = table.concat(config.current.missing_shapes, ", ")
+    -- local string_2 = table.concat(config.current.missing_custom_shapes, ", ")
+    -- if string_1 ~= '' then
+    --     imgui.text('Missing Shape Types: ' .. string_1)
+    -- end
+    -- if string_2 ~= '' then
+    --     imgui.text('Missing Custom Shape Types: ' .. string_2)
+    -- end
+
+    local changed
+    _, config.current.enabled = imgui.checkbox('Draw Hitboxes', config.current.enabled)
+    changed, config.current.enabled_hurtboxes = imgui.checkbox('Draw Hurtboxes', config.current.enabled_hurtboxes)
+
+    if changed and config.current.enabled_hurtboxes and utilities.is_in_quest() then
+        hurtboxes.get_char_base_in_quest()
     end
 
-    _, config.current.enabled = imgui.checkbox('Draw Hitboxes', config.current.enabled)
-    _, config.current.enabled_hurtboxes = imgui.checkbox('Draw Hurtboxes', config.current.enabled_hurtboxes)
     imgui.separator()
     imgui.spacing()
     imgui.unindent(10)
@@ -488,44 +518,41 @@ function config_menu.draw()
     if imgui.collapsing_header('Hitboxes') then
         imgui.indent(10)
         imgui.spacing()
+
         imgui.begin_rect()
-        _, config.current.ignore_small_monsters = imgui.checkbox('Ignore Small Monsters##1', config.current.ignore_small_monsters)
-        _, config.current.ignore_big_monsters = imgui.checkbox('Ignore Big Monsters##2', config.current.ignore_big_monsters)
+        _, config.current.ignore_smallenemy = imgui.checkbox('Ignore Small Monsters##1', config.current.ignore_smallenemy)
+        _, config.current.ignore_bossenemy = imgui.checkbox('Ignore Big Monsters##2', config.current.ignore_bossenemy)
         _, config.current.ignore_otomo = imgui.checkbox('Ignore Otomo##3', config.current.ignore_otomo)
-        _, config.current.ignore_players = imgui.checkbox('Ignore Players##4', config.current.ignore_players)
-        _, config.current.ignore_props = imgui.checkbox('Ignore Props##5', config.current.ignore_props)
-        _, config.current.ignore_creatures = imgui.checkbox('Ignore Creatures##6', config.current.ignore_creatures)
-        _, config.current.ignore_windbox = imgui.checkbox('Ignore Wind Boxes##7', config.current.ignore_windbox)
-        _, config.current.ignore_unguardable = imgui.checkbox('Ignore Unguardable', config.current.ignore_unguardable)
+        _, config.current.ignore_player = imgui.checkbox('Ignore Players##4', config.current.ignore_player)
+        _, config.current.ignore_prop = imgui.checkbox('Ignore Props##5', config.current.ignore_prop)
+        _, config.current.ignore_creature = imgui.checkbox('Ignore Creatures##6', config.current.ignore_creature)
         imgui.end_rect(5,10)
 
         imgui.same_line()
 
         set_pos(5)
+
         imgui.begin_rect()
         imgui.push_item_width(250)
+
         if config.current.hitbox_use_single_color then
             imgui.push_style_var(0,0.4)
         end
-        set_pos(30)
-        _, config.current.small_monster_color = imgui.color_edit('Small Monsters', config.current.small_monster_color)
-        set_pos(30)
-        _, config.current.big_monster_color = imgui.color_edit('Big Monsters', config.current.big_monster_color)
-        set_pos(30)
+
+        _, config.current.smallenemy_color = imgui.color_edit('Small Monsters', config.current.smallenemy_color)
+        _, config.current.bossenemy_color = imgui.color_edit('Big Monsters', config.current.bossenemy_color)
         _, config.current.otomo_color = imgui.color_edit('Otomo', config.current.otomo_color)
-        set_pos(30)
         _, config.current.player_color = imgui.color_edit('Players', config.current.player_color)
-        set_pos(30)
         _, config.current.prop_color = imgui.color_edit('Props', config.current.prop_color)
-        set_pos(30)
         _, config.current.creature_color = imgui.color_edit('Creatures', config.current.creature_color)
-        set_color_w_cb('Windbox','windbox_color')
-        set_color_w_cb('Unguardable','unguardable_color')
+
         if config.current.hitbox_use_single_color then
             imgui.pop_style_var()
         end
+
         imgui.pop_item_width()
         imgui.end_rect(5,10)
+
         imgui.spacing()
         imgui.spacing()
 
@@ -533,30 +560,41 @@ function config_menu.draw()
             set_tooltip('Condition that has to be satisfied for hit to register\nYou can check those in Attack Monitor', true)
             imgui.spacing()
             imgui.begin_rect()
-            if config.current.hitbox_use_single_color then
-                imgui.push_style_var(0,0.4)
-            end
+
             _, config.current.ignore_None = imgui.checkbox('Ignore None', config.current.ignore_None)
+            _, config.current.ignore_windbox = imgui.checkbox('Ignore Wind Boxes', config.current.ignore_windbox)
+            _, config.current.ignore_unguardable = imgui.checkbox('Ignore Unguardable', config.current.ignore_unguardable)
             _, config.current.ignore_frontal = imgui.checkbox('Ignore Frontal', config.current.ignore_frontal)
 
             for _, k in pairs(data.att_cond_match_hit_attr.sort) do
                 _, config.current['ignore_' .. k] = imgui.checkbox('Ignore ' .. k, config.current['ignore_' .. k])
             end
+
             imgui.end_rect(5,10)
             imgui.same_line()
+
+            if config.current.hitbox_use_single_color then
+                imgui.push_style_var(0,0.4)
+            end
 
             set_pos(5)
             imgui.begin_rect()
             imgui.push_item_width(250)
             imgui.invisible_button('',{1, 22})
+
+            set_color_w_cb('Windbox','windbox_color')
+            set_color_w_cb('Unguardable','unguardable_color')
             set_color_w_cb('Frontal','frontal_color')
+
             for _, k in pairs(data.att_cond_match_hit_attr.sort) do
                 set_color_w_cb(k ,k .. '_color')
             end
+
             if config.current.hitbox_use_single_color then
                 imgui.pop_style_var()
             end
             imgui.end_rect(5,10)
+
             imgui.pop_item_width()
             imgui.spacing()
             imgui.tree_pop()
@@ -568,6 +606,7 @@ function config_menu.draw()
             set_tooltip('Damage Type of an attack\nYou can check those in Attack Monitor', true)
             imgui.spacing()
             local count = 0
+
             imgui.begin_rect()
             for _, k in pairs(data.damage_types.sort) do
                 _, config.current['ignore_' .. k] = imgui.checkbox('Ignore ' .. k, config.current['ignore_' .. k])
@@ -584,6 +623,7 @@ function config_menu.draw()
             if count ~= 11 then
                 imgui.end_rect(5,10)
             end
+
             imgui.spacing()
             imgui.tree_pop()
         else
@@ -599,32 +639,38 @@ function config_menu.draw()
         imgui.indent(10)
 
         imgui.spacing()
+
         imgui.begin_rect()
-        _, config.current.ignore_hurtbox_small_monsters = imgui.checkbox('Ignore Small Monsters', config.current.ignore_hurtbox_small_monsters)
-        _, config.current.ignore_hurtbox_big_monsters = imgui.checkbox('Ignore Big Monsters', config.current.ignore_hurtbox_big_monsters)
+        _, config.current.ignore_hurtbox_smallenemy = imgui.checkbox('Ignore Small Monsters', config.current.ignore_hurtbox_smallenemy)
+        _, config.current.ignore_hurtbox_bossenemy = imgui.checkbox('Ignore Big Monsters', config.current.ignore_hurtbox_bossenemy)
         _, config.current.ignore_hurtbox_otomo = imgui.checkbox('Ignore Otomo', config.current.ignore_hurtbox_otomo)
-        _, config.current.ignore_hurtbox_master_player = imgui.checkbox('Ignore Master Player', config.current.ignore_hurtbox_master_player)
+        _, config.current.ignore_hurtbox_masterplayer = imgui.checkbox('Ignore Master Player', config.current.ignore_hurtbox_masterplayer)
         set_tooltip('Thats you', true)
-        _, config.current.ignore_hurtbox_players = imgui.checkbox('Ignore Players', config.current.ignore_hurtbox_players)
-        _, config.current.ignore_hurtbox_creatures = imgui.checkbox('Ignore Creatures', config.current.ignore_hurtbox_creatures)
+        _, config.current.ignore_hurtbox_player = imgui.checkbox('Ignore Players', config.current.ignore_hurtbox_player)
+        _, config.current.ignore_hurtbox_creature = imgui.checkbox('Ignore Creatures', config.current.ignore_hurtbox_creature)
         imgui.end_rect(5,10)
+
         imgui.same_line()
 
         set_pos(5)
         imgui.begin_rect()
         imgui.push_item_width(250)
+
         if config.current.hurtbox_use_single_color then
             imgui.push_style_var(0,0.4)
         end
-        _, config.current.hurtbox_small_monster_color = imgui.color_edit('Small Monsters', config.current.hurtbox_small_monster_color)
-        _, config.current.hurtbox_big_monster_color = imgui.color_edit('Big Monsters', config.current.hurtbox_big_monster_color)
-        _, config.current.hurtbox_otomo_color = imgui.color_edit('Otomo', config.current.hurtbox_otomo_color)
-        _, config.current.hurtbox_master_player_color = imgui.color_edit('Master Player', config.current.hurtbox_master_player_color)
-        _, config.current.hurtbox_player_color = imgui.color_edit('Players', config.current.hurtbox_player_color)
-        _, config.current.hurtbox_creature_color = imgui.color_edit('Creatures', config.current.hurtbox_creature_color)
+
+        _, config.current.hurtbox_smallenemy_color = imgui.color_edit('Small Monsters##2', config.current.hurtbox_smallenemy_color)
+        _, config.current.hurtbox_bossenemy_color = imgui.color_edit('Big Monsters##2', config.current.hurtbox_bossenemy_color)
+        _, config.current.hurtbox_otomo_color = imgui.color_edit('Otomo##2', config.current.hurtbox_otomo_color)
+        _, config.current.hurtbox_masterplayer_color = imgui.color_edit('Master Player##2', config.current.hurtbox_masterplayer_color)
+        _, config.current.hurtbox_player_color = imgui.color_edit('Players##2', config.current.hurtbox_player_color)
+        _, config.current.hurtbox_creature_color = imgui.color_edit('Creatures##2', config.current.hurtbox_creature_color)
+
         if config.current.hurtbox_use_single_color then
             imgui.pop_style_var()
         end
+
         imgui.pop_item_width()
         imgui.end_rect(5,10)
 
@@ -635,6 +681,7 @@ function config_menu.draw()
             if imgui.button(spaced('Create Condition', 3)) then
                 create_condition()
             end
+
             set_tooltip('Changes color or hides hurtboxes if their hitzone value is in from - to range\nIf conditions overlap, whichever gets hit first will apply\n\nCheck order: Exactly as displayed in listbox, Slash->Strike->Shell->etc', true)
             imgui.separator()
 
@@ -644,9 +691,11 @@ function config_menu.draw()
             end
 
             table.sort(sorted, function(x, y) if tonumber(x) > tonumber(y) then return true else return false end end)
+
             for _, k in ipairs(sorted) do
                 condition(k)
             end
+
             imgui.tree_pop()
         else
             imgui.separator()
@@ -662,70 +711,36 @@ function config_menu.draw()
         _, config.current.spawn = imgui.combo('Shape Spawner', config.current.spawn, spawn_combo)
         imgui.pop_item_width()
         imgui.same_line()
+
         if imgui.button(spaced('Go', 7)) then
-            hitboxes.spawn_dummy_shape(spawn_combo[config.current.spawn])
+            dummies.spawn(spawn_combo[config.current.spawn])
         end
+
         imgui.same_line()
+
         if imgui.button(spaced('Clear', 6)) then
-            hitboxes.clear_dummy_shapes()
+            dummies.reset()
         end
+
         imgui.push_item_width(520)
-        set_tooltip('Spawns shape at player position\nWorks in training room and during quests\nDraw Hitboxes has to be enabled',true)
+        set_tooltip('Spawns shape at player position\nWorks in training room and during quests',true)
 
         _, config.current.draw_distance = imgui.slider_float('Draw Distance', config.current.draw_distance, 0, 10000,  "%.0f")
-        if imgui.button(spaced('Restore Defaults', 3)) then
-            imgui.open_popup('confirm3')
-        end
-        set_tooltip('Restores all settings to default')
-
-        if popup_yesno('Are you sure?','confirm3') then
-            config.restore()
-        end
-
-        if imgui.tree_node('Sphere') then
-            _, config.current.sphere_show_outline = imgui.checkbox('Show Outline', config.current.sphere_show_outline)
-            imgui.tree_pop()
-        end
-
-        if imgui.tree_node('Cylinder') then
-            _, config.current.cylinder_show_outline = imgui.checkbox('Show Outline', config.current.cylinder_show_outline)
-            _, config.current.cylinder_show_outline_sides = imgui.checkbox('Show Sides Outline', config.current.cylinder_show_outline_sides)
-            _, config.current.cylinder_segments = imgui.slider_int('Segments', config.current.cylinder_segments, 2, 126, config.slider_data.cylinder_segments[tostring(config.current.cylinder_segments)])
-            set_tooltip('Higher number = more detail, less performance',true)
-            imgui.tree_pop()
-        end
+        _, config.current.show_outline = imgui.checkbox('Show Outline', config.current.show_outline)
+        _, config.current.ignore_duplicate_hitboxes = imgui.checkbox('Ignore Duplicate Hitboxes', config.current.ignore_duplicate_hitboxes)
+        set_tooltip('Some attacks load the same hitboxes more than once\nYou can ignore them to save on some performance', true)
 
         if imgui.tree_node('Capsule') then
-            imgui.new_line()
-            set_tooltip(config.name .. ' Capsule is performance heavy', true)
-            _, config.current.hitbox_capsule = imgui.combo('Hitbox Capsule Type', config.current.hitbox_capsule, {'REF Capsule', config.name .. ' Capsule'})
-            _, config.current.hurtbox_capsule = imgui.combo('Hurtbox Capsule Type', config.current.hurtbox_capsule, {'REF Capsule', config.name .. ' Capsule'})
-            imgui.spacing()
-            _, config.current.capsule_show_outline = imgui.checkbox('Show Outline', config.current.capsule_show_outline)
-            set_tooltip('AHBD Capsule only',true)
-            _, config.current.capsule_show_outline_spheres = imgui.checkbox('Show Spheres Outline', config.current.capsule_show_outline_spheres)
-            set_tooltip('AHBD Capsule only',true)
-            _, config.current.capsule_segments = imgui.slider_int('Segments', config.current.capsule_segments, 2, 126, config.slider_data.capsule_segments[tostring(config.current.capsule_segments)])
-            set_tooltip('Higher number = more detail, less performance\nAHBD Capsule only',true)
-            imgui.tree_pop()
-        end
-
-        if imgui.tree_node('Box') then
-            _, config.current.box_show_outline = imgui.checkbox('Show Outline', config.current.box_show_outline)
-            imgui.tree_pop()
-        end
-
-        if imgui.tree_node('Ring') then
-            _, config.current.ring_show_outline = imgui.checkbox('Show Outline', config.current.ring_show_outline)
-            _, config.current.ring_show_outline_sides = imgui.checkbox('Show Sides Outline', config.current.ring_show_outline_sides)
-            _, config.current.ring_segments = imgui.slider_int('Segments', config.current.ring_segments, 2, 126, config.slider_data.ring_segments[tostring(config.current.ring_segments)])
-            set_tooltip('Higher number = more detail, less performance',true)
+            _, config.current.capsule_body = imgui.combo('Body', config.current.capsule_body, {'Ellipse', 'Quad'})
             imgui.tree_pop()
         end
 
         if imgui.tree_node('Colors') then
+            _, config.current.outline_color = imgui.color_edit('Outline', config.current.outline_color)
             _, config.current.hitbox_use_single_color = imgui.checkbox('Use Single Color', config.current.hitbox_use_single_color)
+
             imgui.same_line()
+
             if imgui.button(spaced('Apply Hitbox Color To All Hitbox Colors', 3)) then
                 imgui.open_popup('confirm1')
             end
@@ -749,15 +764,20 @@ function config_menu.draw()
             if not config.current.hitbox_use_single_color then
                 imgui.push_style_var(0,0.4)
             end
+
             _, config.current.color = imgui.color_edit('Hitbox', config.current.color)
+
             if not config.current.hitbox_use_single_color then
                 imgui.pop_style_var()
             end
 
             imgui.spacing()
             imgui.spacing()
+
             _, config.current.hurtbox_use_single_color = imgui.checkbox('Use Single Color##single_2', config.current.hurtbox_use_single_color)
+
             imgui.same_line()
+
             if imgui.button(spaced('Apply Hurtbox Color To All Hurtbox Colors', 3)) then
                 imgui.open_popup('confirm2')
             end
@@ -772,19 +792,33 @@ function config_menu.draw()
             end
 
             _, config.current.hurtbox_highlight_color = imgui.color_edit('Hurtbox Highlight', config.current.hurtbox_highlight_color)
+
             if not config.current.hurtbox_use_single_color then
                 imgui.push_style_var(0,0.4)
             end
+
             _, config.current.hurtbox_color = imgui.color_edit('Hurtbox', config.current.hurtbox_color)
+
             if not config.current.hurtbox_use_single_color then
                 imgui.pop_style_var()
             end
+
             imgui.tree_pop()
         end
 
         if imgui.tree_node('Master Player Hurtbox') then
             _, config.current.hide_when_invulnerable = imgui.checkbox('Hide When Invulnerable', config.current.hide_when_invulnerable)
             imgui.tree_pop()
+        end
+
+        if imgui.button(spaced('Restore Defaults', 3)) then
+            imgui.open_popup('confirm3')
+        end
+
+        set_tooltip('Restores all settings to default')
+
+        if popup_yesno('Are you sure?','confirm3') then
+            config.restore()
         end
 
         imgui.unindent(10)
@@ -811,10 +845,12 @@ function config_menu.draw()
         imgui.spacing()
 
         if not config.attack_monitor_detach then
-            if imgui.button(spaced('Detach',3 ) .. '##det1') then
+
+            if imgui.button(spaced('Detach', 3) .. '##det1') then
                 config.attack_monitor_detach = true
                 attack_monitor.is_opened = true
             end
+
             draw_attack_monitor()
         else
             imgui.text('Detached')
@@ -847,10 +883,12 @@ function config_menu.draw()
         imgui.spacing()
 
         if not config.hurtbox_monitor_detach then
-            if imgui.button(spaced('Detach',3 ) .. '##det2') then
+
+            if imgui.button(spaced('Detach', 3) .. '##det2') then
                 config.hurtbox_monitor_detach = true
                 hurtbox_monitor.is_opened = true
             end
+
             draw_hurtbox_monitor()
         else
             imgui.text('Detached')
@@ -871,8 +909,10 @@ end
 function config_menu.init()
     config = require("AHBD.config")
     data = require("AHBD.data")
-    hitboxes = require("AHBD.hitboxes")
     misc = require("AHBD.misc")
+    dummies = require("AHBD.dummies")
+    hurtboxes = require("AHBD.hurtboxes")
+    utilities = require("AHBD.utilities")
 end
 
 return config_menu

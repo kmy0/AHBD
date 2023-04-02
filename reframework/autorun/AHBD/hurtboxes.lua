@@ -8,14 +8,9 @@ local data
 
 local enemy_hitzone_status = {}
 local hurtbox_cache = {}
-local cache_cleared = false
 local to_draw = {}
-
-local to_load
-local loading = false
-local timer = os.clock()
+local to_load = {}
 local update_count = 0
-local max_updates = 20
 
 
 local function create_hurtbox_monitor_entry(name, group, parent, meat, part_group)
@@ -27,6 +22,7 @@ local function create_hurtbox_monitor_entry(name, group, parent, meat, part_grou
             part_group=part_group,
             collidables={}
         }
+
         if not data.hurtbox_monitor[name] then
             data.hurtbox_monitor[name] = {
                 groups={
@@ -39,6 +35,7 @@ local function create_hurtbox_monitor_entry(name, group, parent, meat, part_grou
             data.hurtbox_monitor[name].groups[group] = entry
         end
     end
+
     return data.hurtbox_monitor[name].groups[group]
 end
 
@@ -47,7 +44,6 @@ local function add_collidable(name, col, parent, meat, group, part_group)
         parent=parent,
         col=col,
         color=config.current.hurtbox_color,
-        type='hurtbox',
         sort=0,
         group=group,
         part_group=part_group,
@@ -55,45 +51,27 @@ local function add_collidable(name, col, parent, meat, group, part_group)
         meat=meat,
         pos=Vector3f.new(0, 0, 0),
         distance=0,
-        shape_type=utilities.get_shape_type(col),
+        shape=col:get_TransformedShape(),
+        info={
+            userdata=col:get_UserData(),
+            type='hurtbox'
+        },
         enabled=col:get_Enabled()
     }
 
-    if parent.master_player then
-        table.insert(
-            misc.get_nested_table(
-                misc.get_nested_table(to_draw, 'master_player'), name), col_data
-            )
-    elseif parent.player then
-        table.insert(
-            misc.get_nested_table(
-                misc.get_nested_table(to_draw, 'player'), name), col_data
-            )
-    elseif parent.enemy then
-        if parent.enemy.boss then
-            table.insert(
-                misc.get_nested_table(
-                    misc.get_nested_table(to_draw, 'bossenemy'), name), col_data
-                )
+    local is_custom, shape_type = utilities.check_custom_shape(col_data, col_data.info.userdata)
+    if is_custom then
+        col_data.info.custom_shape_type = shape_type
+        col_data.info.shape_name = data.custom_shape_id[tostring(shape_type)]
+    else
+        col_data.info.shape_type = shape_type
+        col_data.info.shape_name = data.shape_id[tostring(shape_type)]
+    end
 
-            table.insert(create_hurtbox_monitor_entry(name, group, parent, meat, part_group).collidables, col_data)
-        else
-            table.insert(
-                misc.get_nested_table(
-                    misc.get_nested_table(to_draw, 'smallenemy'), name), col_data
-                )
-        end
-    elseif parent.creature then
-        table.insert(
-            misc.get_nested_table(
-                misc.get_nested_table(to_draw, 'creature'), name), col_data
-            )
+    table.insert(misc.get_nested_table(to_draw, string.format("%s%s", parent.master_player and "master" or "", parent.type), name), col_data)
 
-    elseif parent.otomo then
-        table.insert(
-            misc.get_nested_table(
-                misc.get_nested_table(to_draw, 'otomo'), name), col_data
-            )
+    if parent.type == 'bossenemy'then
+        table.insert(create_hurtbox_monitor_entry(name, group, parent, meat, part_group).collidables, col_data)
     end
 end
 
@@ -103,175 +81,146 @@ local function create_parent_data(char_base)
     if char_type == 4 or char_type == 3 then return end  --Shell, Npc
 
     data.char_objects[char_base] = utilities.get_parent_data(char_type, char_base)
+
     return data.char_objects[char_base]
 end
 
-local function load_hurtboxes_from_json()
-    local cache = json.load_file(config.hurtbox_cache_path)
-    if cache then
-        local transforms = utilities.get_all_transfroms()
-        for i=0, transforms:get_Count()-1 do
-            local transform = transforms:get_Item(i)
-            local game_object = transform:get_GameObject()
-            local game_object_name = game_object:get_Name()
-            local game_object_address = game_object:get_address()
-            local key = game_object_name .. '@' .. game_object_address
+local function get_char_base(args)
+    if config.current.enabled_hurtboxes then
+        local char_base = sdk.to_managed_object(args[2])
+        local game_object = char_base:get_GameObject()
+        local rsc = utilities.get_component(game_object, 'via.physics.RequestSetCollider')
 
-            if cache[key] then
-                local char_base = utilities.get_component(game_object, 'snow.CharacterBase')
-                if char_base then
-                    local parent = create_parent_data(char_base)
-                    if parent then
-                        parent.rsc = utilities.get_component(game_object, 'via.physics.RequestSetCollider')
-                        data.to_update[char_base] = true
-                        data.char_objects[char_base] = parent
-                        for rs_id, _ in pairs(cache[key]) do
-                            local t = {
-                                parent=parent,
-                                rs_id=tonumber(rs_id)
-                            }
-                            to_load = misc.set_nested_table(to_load, key, rs_id, t)
-                            timer = os.clock()
-                        end
-                    end
-                end
-            end
+        if not rsc then return end
+
+        local parent = create_parent_data(char_base)
+
+        if parent then
+            parent.rsc = rsc
+            data.to_update[char_base] = true
+            table.insert(to_load, {
+                parent=parent,
+                name=game_object:get_Name() .. '@' .. game_object:get_address()
+            })
         end
     end
 end
 
 local function load_hurtboxes()
-    if to_load and os.clock() - timer > 3 then
+    update_count = 0
 
-        loading = true
-        update_count = 0
+    for idx, char_base_data in pairs(to_load) do
 
-        for name, t in pairs(to_load) do
-            if update_count_load == config.max_updates then
-                return
+        local parent = char_base_data.parent
+        local name = char_base_data.name
+
+        if parent.type == 'player' or parent.type == 'otomo' then
+            local col = parent.rsc:call('getCollidableFromIndex(System.UInt32, System.UInt32)', 0, 0)
+
+            if col then
+                add_collidable(name, col, parent)
             end
+        else
+            for i=0, parent.rsc:get_NumRequestSets()-1 do
+                for j=0, parent.rsc:getNumCollidablesFromIndex(i)-1 do
+                    local col = parent.rsc:call('getCollidableFromIndex(System.UInt32, System.UInt32)', i, j)
 
-            for rs_string, collidable in pairs(t) do
-                hurtbox_cache = misc.set_nested_table(hurtbox_cache, name, rs_string, true)
-
-                if collidable.parent.player or collidable.parent.otomo then
-                    local col = collidable.parent.rsc:call('getCollidableFromIndex(System.UInt32, System.UInt32, System.UInt32)', 0, 0, 0)
                     if col then
-                        add_collidable(name, col, collidable.parent)
-                    end
-                else
-                    for i=0 ,collidable.parent.rsc:getNumRequestSetIds(collidable.rs_id)-1 do
-                        for j=0, collidable.parent.rsc:getNumCollidablesFromIndex(i)-1 do
-                            local col = collidable.parent.rsc:call('getCollidableFromIndex(System.UInt32, System.UInt32, System.UInt32)', collidable.rs_id, i, j)
-                            if col then
-                                local userdata = col:get_UserData()
-                                if collidable.parent.creature then
-                                    add_collidable(name, col, collidable.parent)
-                                elseif userdata:get_type_definition():is_a("snow.hit.userdata.EmHitDamageShapeData") then
-                                    local parent_userdata = userdata:get_ParentUserData()
+                        local userdata = col:get_UserData()
 
-                                    if not parent_userdata:get_type_definition():is_a("snow.hit.userdata.EmHitDamageRSData") then
-                                        goto next
-                                    end
+                        if parent.type == 'creature' then
+                            add_collidable(name, col, parent)
+                        elseif userdata:get_type_definition():is_a("snow.hit.userdata.EmHitDamageShapeData") then
+                            local parent_userdata = userdata:get_ParentUserData()
 
-                                    local meat = userdata:get_Meat()
-                                    local group = parent_userdata:get_Name()
-                                    local part_group = parent_userdata:get_Group()
-
-                                    misc.set_nested_table(collidable.parent.meat, tostring(meat), tostring(part_group), true)
-                                    add_collidable(name, col, collidable.parent, meat, group, part_group)
-                                end
+                            if not parent_userdata:get_type_definition():is_a("snow.hit.userdata.EmHitDamageRSData") then
+                                goto next
                             end
-                            ::next::
+
+                            local meat = userdata:get_Meat()
+                            local group = parent_userdata:get_Name()
+                            local part_group = parent_userdata:get_Group()
+
+                            misc.set_nested_value(parent.meat, true, meat, part_group)
+                            add_collidable(name, col, parent, meat, group, part_group)
                         end
                     end
+
+                    ::next::
                 end
             end
-
-            update_count = update_count + 1
-            to_load[name] = nil
         end
 
-        if update_count == 0 then
-            json.dump_file(config.hurtbox_cache_path, hurtbox_cache)
-            cache_cleared = false
-            to_load = nil
-            loading = false
+        update_count = update_count + 1
+        to_load[idx] = nil
+
+        if update_count == config.max_updates then
+            return
         end
     end
 end
 
-function hurtboxes.get_hurtboxes(args)
-    if not loading and utilities.is_in_quest() then
-        local obj = sdk.to_managed_object(args[1])
-        local game_object = obj:get_GameObject()
-        local game_object_name = game_object:get_Name()
-        local char_base = utilities.get_component(game_object, 'snow.CharacterBase')
-        local parent = data.char_objects[char_base]
-        local address = game_object:get_address()
+function hurtboxes.get_char_base_in_quest()
+    local transforms = utilities.get_all_transfroms()
 
-        if not parent then
+    for i=0, transforms:get_Count()-1 do
+        local transform = transforms:get_Item(i)
+        local game_object = transform:get_GameObject()
+        local rsc = utilities.get_component(game_object, 'via.physics.RequestSetCollider')
+
+        if rsc then
+            local char_base = utilities.get_component(game_object, 'snow.CharacterBase')
+
             if char_base then
-                parent = create_parent_data(char_base)
-                data.to_update[char_base] = true
+                local parent = create_parent_data(char_base)
+
+                if parent then
+                    parent.rsc = rsc
+                    data.to_update[char_base] = true
+
+                    table.insert(to_load, {
+                        parent=parent,
+                        name=game_object:get_Name() .. '@' .. game_object:get_address()
+                    })
+                end
             end
         end
+    end
+end
+
+function hurtboxes.get_base(args)
+    local char_base = sdk.to_managed_object(args[2])
+    local game_object = char_base:get_GameObject()
+    local rsc = utilities.get_component(game_object, 'via.physics.RequestSetCollider')
+
+    if rsc then
+        local parent = create_parent_data(char_base)
 
         if parent then
-            if not to_load then to_load = {} end
-            parent.rsc = obj
-            local rs_id = sdk.to_int64(args[2])
-            local key = game_object_name .. '@' .. address
-            if not to_load[key] then
-                to_load[key] = {}
-                to_load[key][tostring(rs_id)] = {
-                    parent=parent,
-                    rs_id=rs_id
-                }
-            end
+            parent.rsc = rsc
+            data.to_update[char_base] = true
+            table.insert(to_load, {
+                parent=parent,
+                name=game_object:get_Name() .. '@' .. game_object:get_address()
+            })
         end
-
-        timer = os.clock()
     end
 end
 
 function hurtboxes.reset()
     data.char_objects = {}
-    hurtbox_cache = {}
-    if not cache_cleared then
-        json.dump_file(config.hurtbox_cache_path, nil)
-        cache_cleared = true
-    end
-    to_draw = {}
     data.hurtbox_monitor = {}
-    to_load = nil
-    loading = false
+    to_draw = {}
+    to_load = {}
 end
 
 function hurtboxes.get()
-    load_hurtboxes()
     if config.current.enabled_hurtboxes then
+        load_hurtboxes()
+
         for parent_name, parent_data in pairs(to_draw) do
-            if (
-                parent_name == 'bossenemy'
-                and config.current.ignore_hurtbox_big_monsters
-                or (
-                    parent_name == 'smallenemy'
-                    and config.current.ignore_hurtbox_small_monsters
-                ) or (
-                      parent_name == 'master_player'
-                      and config.current.ignore_hurtbox_master_player
-                  ) or (
-                        parent_name == 'player'
-                        and config.current.ignore_hurtbox_players
-                    ) or (
-                          parent_name == 'otomo'
-                          and config.current.ignore_hurtbox_otomo
-                      ) or (
-                            parent_name == 'creature'
-                            and config.current.ignore_hurtbox_creatures
-                        )
-            ) then
+
+            if config.current[string.format("ignore_hurtbox_%s", parent_name)] then
                 goto next_parent
             end
 
@@ -281,7 +230,9 @@ function hurtboxes.get()
                     enemy_hitzone_status = {}
                 end
 
+                local color = config.current[string.format("hurtbox_%s_color", parent_name)]
                 for idx, col in pairs(cols) do
+
                     if col.parent.distance > config.current.draw_distance then
                         goto next_game_object
                     end
@@ -300,26 +251,13 @@ function hurtboxes.get()
                         col.color = config.current.hurtbox_highlight_color
                     else
                         if not config.current.hurtbox_use_single_color then
-                            if col.parent.enemy then
-                                if col.parent.enemy.boss then
-                                    col.color = config.current.hurtbox_big_monster_color
-                                else
-                                    col.color = config.current.hurtbox_small_monster_color
-                                end
-                            elseif col.parent.master_player then
-                                col.color = config.current.hurtbox_master_player_color
-                            elseif col.parent.player then
-                                col.color = config.current.hurtbox_player_color
-                            elseif col.parent.otomo then
-                                col.color = config.current.hurtbox_otomo_color
-                            elseif col.parent.creature then
-                                col.color = config.current.hurtbox_creature_color
-                            end
+                            col.color = color
                         else
                             col.color = config.current.hurtbox_color
                         end
 
-                        if col.parent.enemy then
+                        if (col.parent.type == 'bossenemy' or col.parent.type == 'smallenemy') and next(config.current.hitzone_conditions) then
+
                             if enemy_hitzone_status[col.group] then
                                 if enemy_hitzone_status[col.group].ignore then
                                     goto next_col
@@ -327,13 +265,19 @@ function hurtboxes.get()
                                     col.color = enemy_hitzone_status[col.group].color
                                 end
                             else
-                                enemy_hitzone_status[col.group] = {}
-                                for type=1, 8 do
-                                    local conditions = config.raw_hitzone_conditions[type]
-                                    if col.parent.hitzones and col.parent.hitzones[tostring(col.meat)] then
-                                        local hitzone = col.parent.hitzones[tostring(col.meat)][tostring(col.part_group)][type]
+                                local meat = tostring(col.meat)
+
+                                if col.parent.hitzones and col.parent.hitzones[meat] then
+                                    enemy_hitzone_status[col.group] = {}
+                                    local hitzones = col.parent.hitzones[meat][tostring(col.part_group)]
+
+                                    for type=1, #data.damage_elements do
+                                        local conditions = config.raw_hitzone_conditions[type]
+                                        local hitzone = hitzones[type]
+
                                         for i=1, #conditions do
                                             local cond = conditions[i]
+
                                             if hitzone >= cond.from and hitzone <= cond.to then
                                                 if cond.ignore then
                                                     enemy_hitzone_status[col.group].ignore = true
@@ -367,6 +311,8 @@ function hurtboxes.get()
 
             ::next_parent::
         end
+    else
+        hurtboxes.reset()
     end
 end
 
@@ -377,8 +323,8 @@ function hurtboxes.init()
     utilities = require("AHBD.utilities")
     data = require("AHBD.data")
 
-    if utilities.is_in_quest() then
-        load_hurtboxes_from_json()
+    if config.current.enabled_hurtboxes and utilities.is_in_quest() then
+        hurtboxes.get_char_base_in_quest()
     end
 end
 

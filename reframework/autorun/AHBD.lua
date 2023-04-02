@@ -4,6 +4,7 @@ local data = require("AHBD.data")
 local utilities = require("AHBD.utilities")
 local hitboxes = require("AHBD.hitboxes")
 local hurtboxes = require("AHBD.hurtboxes")
+local dummies = require("AHBD.dummies")
 local drawing = require("AHBD.drawing")
 local misc = require("AHBD.misc")
 
@@ -15,17 +16,35 @@ config_menu.init()
 drawing.init()
 hitboxes.init()
 hurtboxes.init()
+dummies.init()
 
 
-sdk.hook(sdk.find_type_definition("via.physics.RequestSetCollider"):get_method('getCollidableFromIndex(System.UInt32, System.UInt32, System.UInt32)'), hurtboxes.get_hurtboxes)
+sdk.hook(sdk.find_type_definition("snow.CharacterBase"):get_method('start()'), hurtboxes.get_base)
 sdk.hook(sdk.find_type_definition('snow.hit.AttackWork'):get_method('initialize(System.Single, System.Single, System.UInt32, System.UInt32, System.Int32, snow.hit.userdata.BaseHitAttackRSData)'), hitboxes.get_attacks)
 
 
 re.on_draw_ui(
     function()
-        if imgui.button(config.name .. " " ..config.version) then
+        if imgui.button(string.format("%s %s", config.name, config.version)) then
             config_menu.is_opened = not config_menu.is_opened
         end
+    end
+)
+
+re.on_pre_application_entry(
+    'BeginRendering',
+    function()
+        -- if utilities.is_in_quest() then
+        --     utilities.update_objects()
+        --     hurtboxes.get()
+        --     hitboxes.get()
+        --     dummies.get()
+        --     drawing.draw()
+        -- else
+        --     hitboxes.reset()
+        --     hurtboxes.reset()
+        --     dummies.reset()
+        -- end
     end
 )
 
@@ -43,10 +62,12 @@ re.on_frame(
             utilities.update_objects()
             hurtboxes.get()
             hitboxes.get()
+            dummies.get()
             drawing.draw()
         else
             hitboxes.reset()
             hurtboxes.reset()
+            dummies.reset()
         end
     end
 )

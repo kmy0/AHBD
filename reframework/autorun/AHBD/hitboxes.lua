@@ -7,104 +7,93 @@ local drawing
 local utilities
 
 local rsc_controllers = {}
-local attacks = {}
+local to_draw = {}
 local attacks_cache = {}
-local dummy_shapes = {}
+local active_attacks = {}
+local parent_type_to_name = {
+    player = "Player",
+    bossenemy = "Big Monster",
+    smallenemy = "Small Monster",
+    otomo = "Otomo",
+    creature = "Creature",
+    prop = "Prop"
+}
 
 
-local function draw_dummies()
-    for shape, pos in pairs(dummy_shapes) do
-
-        if (pos[1] - data.master_player.pos):length() > config.current.draw_distance then
-            goto next
-        end
-
-        if shape == 'Sphere' then
-            draw.sphere(
-                pos[1],
-                pos[2],
-                config.current.color,
-                config.current.sphere_show_outline
-            )
-        elseif shape == 'Cylinder' then
-            drawing.cylinder(
-                pos[1],
-                pos[2],
-                pos[3],
-                config.current.color,
-                config.slider_data.cylinder_segments[tostring(config.current.cylinder_segments)],
-                true,
-                config.current.cylinder_show_outline,
-                config.current.cylinder_show_outline_sides,
-                false
-            )
-        elseif shape == 'Capsule' then
-            if config.current.hitbox_capsule == 1 then
-                draw.capsule(
-                    pos[1],
-                    pos[2],
-                    pos[3],
-                    config.current.color,
-                    true
-                )
-            else
-                drawing.capsule(
-                    pos[1],
-                    pos[2],
-                    pos[3],
-                    config.current.color,
-                    config.slider_data.capsule_segments[tostring(config.current.capsule_segments)],
-                    config.current.capsule_show_outline,
-                    config.current.capsule_show_outline_spheres
-                )
-            end
-        elseif shape == 'Box' then
-            drawing.box(
-                pos[1],
-                pos[2],
-                config.current.color,
-                config.current.box_show_outline
-            )
-        elseif shape == 'Ring' then
-            drawing.ring(
-                pos[1],
-                pos[2],
-                pos[3],
-                pos[4],
-                config.current.color,
-                config.slider_data.ring_segments[tostring(config.current.ring_segments)],
-                config.current.ring_show_outline,
-                config.current.ring_show_outline_sides
-            )
-        end
-
-        ::next::
+local function get_attack_data(attack)
+    if attacks_cache[attack.key] then
+        return attacks_cache[attack.key]
     end
+
+    local attack_data = {}
+
+    if attack.parent.type == 'player' and attack.parent.master_player then
+        attack_data.parent = 'Master Player'
+    elseif attack.parent.type == 'otomo' and attack.parent.servant then
+        attack_data.parent = 'OtomoServant'
+    else
+        attack_data.parent = parent_type_to_name[attack.parent.type]
+    end
+
+    attack_data.name = attack.rs_data:ToString()
+    attack_data.motion_value = attack.rs_data._BaseDamage
+    attack_data.damage_type = attack.rs_data._DamageType
+    attack_data.damage_type_name = data.damage_types.ids[tostring(attack_data.damage_type)]
+    attack_data.guardable = attack.rs_data:get_GuardableType()
+    attack_data.col_count = attack.rsc_controller:getNumCollidables(attack.res_idx, attack.rs_id)
+    attack_data.ele_mod = attack.rs_data['<SubRate>k__BackingField']
+    attack_data.ele_mod = attack_data.ele_mod or "None"
+    attack_data.debuff_mod = attack.rs_data['<DebuffRate>k__BackingField']
+    attack_data.debuff_mod = attack_data.debuff_mod or 'None'
+    attack_data.id = attack.parent.id or "None"
+    attack_data.power = attack.rs_data._Power
+    attack_data.element = data.element_id[tostring(attack.rs_data['<AttackElement>k__BackingField'])]
+    attack_data.element_value = attack.rs_data._BaseAttackElement
+    attack_data.debuff_value = attack.rs_data['<DebuffValue>k__BackingField']
+    attack_data.debuff_1 = data.debuff_id[tostring(attack.rs_data['<DebuffType>k__BackingField'])]
+    attack_data.sharpness = data.sharpness_id[tostring(attack.rs_data['<SharpnessType>k__BackingField'])]
+    attack_data.guardable = data.guard_id[attack_data.guardable]
+    attack_data.start_delay = attack.rs_data._HitStartDelay
+    attack_data.end_delay = attack.rs_data._HitStartDelay
+    attack_data.collidables = {}
+
+    return attack_data
 end
 
-function hitboxes.spawn_dummy_shape(shape_name)
-    local shape = misc.table_copy(data.dummy_shapes[shape_name])
-    local player_pos = utilities.get_player_pos()
-    if player_pos then
-        if shape_name == 'Sphere' or shape_name == 'Box' then
-            shape[1] = shape[1] + player_pos
-        else
-            shape[1] = shape[1] + player_pos
-            shape[2] = shape[2] + player_pos
-        end
-        dummy_shapes[shape_name] = shape
-    end
-end
+local function get_collidable_info(collidable, col_data)
+    local col_info = {}
+    col_info.userdata = collidable:get_UserData()
+    col_info.is_windbox = col_info.userdata:get_type_definition():is_a("snow.hit.userdata.HitAttackAppendShapeData")
+    col_info.is_frontal = col_info.userdata._EnemyHitCheckVec == 0
+    col_info.attack_condition = col_info.userdata._ConditionMatchHitAttr
+    col_info.type = 'hitbox'
 
-function hitboxes.clear_dummy_shapes()
-    dummy_shapes = {}
+    if not col_info.attack_condition then
+        col_info.attack_condition = 0
+    end
+
+    col_info.attack_condition_name = data.att_cond_match_hit_attr.ids[tostring(col_info.attack_condition)]
+    if not col_info.attack_condition_name then
+        col_info.attack_condition_name = 'Invalid'
+    end
+
+    local is_custom, shape_type = utilities.check_custom_shape(col_data, col_info.userdata)
+
+    if is_custom then
+        col_info.custom_shape_type = shape_type
+        col_info.shape_name = data.custom_shape_id[tostring(shape_type)]
+    else
+        col_info.shape_type = shape_type
+        col_info.shape_name = data.shape_id[tostring(shape_type)]
+    end
+
+    return col_info
 end
 
 function hitboxes.get_attacks(args)
     local attack_work = sdk.to_managed_object(args[2])
     local rsc_controller = attack_work:get_RSCCtrl()
     local parent = rsc_controllers[rsc_controller]
-    local rs_data = sdk.to_managed_object(args[8])
 
     if not parent then
         local game_object = rsc_controller:get_GameObject()
@@ -115,6 +104,7 @@ function hitboxes.get_attacks(args)
 
             if not char_obj then
                 local char_type = char_base:getCharacterType()
+
                 if char_type == 4 then      --shell
                     char_base = char_base:get_OwnerObject()
                     char_obj = data.char_objects[char_base]
@@ -137,247 +127,152 @@ function hitboxes.get_attacks(args)
             end
         else
             parent = {}
-            parent.props = true
+            parent.type = 'prop'
             parent.distance = 0
         end
     end
 
-    if (
-        parent.player
-        and not config.current.ignore_players
-        or (
-            parent.otomo
-            and not config.current.ignore_otomo
-        ) or (
-              parent.enemy
-              and (
-                   not config.current.ignore_big_monsters
-                   and parent.enemy.boss
-                   or (
-                       not config.current.ignore_small_monsters
-                       and not parent.enemy.boss
-                   )
-              )
-          ) or (
-                parent.props
-                and not config.current.ignore_props
-            ) or (
-                  parent.creature
-                  and not config.current.ignore_creatures
-              )
-    ) then
-        table.insert(attacks, {
-            rsc_controller=rsc_controller,
-            parent=parent,
-            attack_work=attack_work,
-            rs_data=rs_data,
-            res_idx=args[5],
-            rs_id=args[6]
-        })
+     if not config.current[string.format('ignore_%s', parent.type)] then
+        local res_idx = sdk.to_int64(args[5]) & 0xFF
+        local rs_id = sdk.to_int64(args[6]) & 0xFF
+        local key = string.format("%i|%i|%i", rsc_controller:get_address(), res_idx, rs_id)
+
+        if not config.current.ignore_duplicate_hitboxes or not active_attacks[key] then
+            table.insert(to_draw, {
+                rsc_controller = rsc_controller,
+                parent = parent,
+                attack_work = attack_work,
+                rs_data = sdk.to_managed_object(args[8]),
+                res_idx = res_idx,
+                rs_id = rs_id,
+                key = key
+            })
+
+            active_attacks[key] = true
+        end
     end
 end
 
 function hitboxes.reset()
-    attacks = {}
+    to_draw = {}
     rsc_controllers = {}
     data.char_objects = {}
     attacks_cache = {}
-    dummy_shapes = {}
+    active_attacks = {}
 end
 
 function hitboxes.get()
     if config.current.enabled then
-        draw_dummies()
 
-        for idx, att in pairs(attacks) do
+        local function remove(idx, key)
+            to_draw[idx] = nil
+            active_attacks[key] = nil
+        end
 
-            if att.parent.distance > config.current.draw_distance then
-                attacks[idx] = nil
+        for idx, attack in pairs(to_draw) do
+
+            if attack.parent.distance > config.current.draw_distance then
+                remove(idx, attack.key)
                 goto continue
             end
 
-            local phase = att.attack_work:get_Phase()
+            local phase = attack.attack_work:get_Phase()
 
             if (
                 phase == 3
-                or att.attack_work:get_reference_count() == 1
+                or attack.attack_work:get_reference_count() == 1
                 or (
-                    att.collidables
-                    and #att.collidables == 0
+                    attack.collidables
+                    and #attack.collidables == 0
                 )
             ) then
-                attacks[idx] = nil
+                remove(idx, attack.key)
                 goto continue
 
             elseif phase == 2 then
-                if not att.collidables then
-                    att.collidables = {}
-                    local attack_data = {}
-                    local ignore_monitor
-                    local key
-
-                    if not config.current.pause_monitor then
-
-                        attack_data.id = att.parent.id
-                        if not attack_data.id then
-                            attack_data.id = 'None'
-                        end
-                        attack_data.name = att.rs_data:ToString()
-
-                        attack_data.parent = ''
-                        if att.parent.prop then
-                            attack_data.parent = 'Prop'
-                        elseif att.parent.enemy then
-                            if att.parent.enemy.boss then
-                                attack_data.parent = 'Big Monster'
-                            else
-                                attack_data.parent = 'Small Monster'
-                            end
-                        elseif att.parent.player then
-                            if att.parent.servant then
-                                attack_data.parent = 'Servant'
-                            else
-                                attack_data.parent = 'Player'
-                            end
-                        elseif att.parent.otomo then
-                            if att.parent.servant then
-                                attack_data.parent = 'OtomoServant'
-                            else
-                                attack_data.parent = 'Otomo'
-                            end
-                        elseif att.parent.creature then
-                            attack_data.parent = 'Creature'
-                        end
-
-                        key = attack_data.parent .. attack_data.id .. attack_data.name
-                        if attacks_cache[key] then
-                            attack_data = attacks_cache[key]
-                            attack_data.cache = true
-                        end
-                    end
-
-                    if not attack_data.cache then
-                        attack_data.motion_value = att.rs_data._BaseDamage
-                        attack_data.damage_type = att.rs_data._DamageType
-                        attack_data.damage_type_name = data.damage_types.ids[tostring(attack_data.damage_type)]
-                        attack_data.att_cond_types = {}
-                        attack_data.shape_count = {}
-                        attack_data.windbox_count = 0
-                        attack_data.frontal_count = 0
-                        attack_data.guardable = att.rs_data:get_GuardableType()
-                    end
+                if not attack.collidables then
+                    local attack_data = get_attack_data(attack)
+                    attack.collidables = {}
 
                     if (
                         attack_data.guardable == 2
                         and config.current.ignore_unguardable
-                        or config.current['ignore_' .. attack_data.damage_type_name]
+                        or config.current[string.format("ignore_%s", attack_data.damage_type_name)]
                     ) then
-                        if key and attacks_cache[key] and not attacks_cache[key].cache then
-                            attacks_cache[key] = nil
-                        end
                         goto continue
                     end
 
-                    attack_data.col_count = att.rsc_controller:getNumCollidables(att.res_idx, att.rs_id)
+                    local am_data = {
+                        attack_condition_types = {},
+                        shape_count = {},
+                        windbox_count = 0,
+                        frontal_count = 0,
+                        active_count = 0
+                    }
+                    local color = config.current[string.format("%s_color", attack.parent.type)]
+
                     for i=0, attack_data.col_count-1 do
-                        local collidable = att.rsc_controller:getCollidable(att.res_idx, att.rs_id, i)
-                        local userdata = collidable:get_UserData()
-                        local frontal = userdata._EnemyHitCheckVec == 0
-                        local att_cond = userdata._ConditionMatchHitAttr
-                        local custom_shape = userdata._CustomShapeType
-                        local att_cond_name = nil
-                        local shape_name = nil
-                        local windbox = userdata:get_type_definition():is_a("snow.hit.userdata.HitAttackAppendShapeData")
+                        local collidable = attack.rsc_controller:getCollidable(attack.res_idx, attack.rs_id, i)
+                        local col_info
                         local col_data = {
-                            col=collidable,
-                            color=config.current.color,
-                            type='hitbox',
-                            pos=Vector3f.new(0, 0 ,0),
-                            distance=0,
-                            sort=0,
-                            att=att
+                            col = collidable,
+                            pos = Vector3f.new(0, 0 ,0),
+                            distance = 0,
+                            sort = 0,
+                            color = config.current.color,
+                            shape = collidable:get_TransformedShape()
                         }
 
-                        if not att_cond then
-                            att_cond = 0
-                        end
-
-                        if windbox and not attack_data.cache then
-                            attack_data.windbox_count = attack_data.windbox_count + 1
-                        end
-
-                        if frontal and not attack_data.cache then
-                            attack_data.frontal_count = attack_data.frontal_count + 1
-                        end
-
-                        att_cond_name = data.att_cond_match_hit_attr.ids[tostring(att_cond)]
-                        if not att_cond_name then
-                            att_cond_name = 'Invalid'
-                        end
-
-                        if not attack_data.cache and not misc.table_contains(attack_data.att_cond_types, att_cond_name) then
-                            table.insert(attack_data.att_cond_types, att_cond_name)
-                        end
-
-                        if custom_shape ~= 0 then
-                            shape_name = data.custom_shape_id[tostring(custom_shape)]
-                            col_data.custom_shape_type = custom_shape
-                            col_data.userdata = userdata
-                            if not misc.table_contains(data.valid_custom_shapes, custom_shape) then
-                                if not misc.table_contains(config.current.missing_custom_shapes, custom_shape) then
-                                    table.insert(config.current.missing_custom_shapes, custom_shape)
-                                end
-                            end
+                        if attack_data.cache then
+                            col_info = attack_data.collidables[i]
                         else
-                            col_data.shape_type = utilities.get_shape_type(collidable)
-                            shape_name = data.shape_id[tostring(col_data.shape_type)]
-                            if not misc.table_contains(data.valid_shapes, col_data.shape_type) then
-                                if not misc.table_contains(config.current.missing_shapes, col_data.shape_type) then
-                                    table.insert(config.current.missing_shapes, col_data.shape_type)
-                                end
-                            end
+                            col_info = get_collidable_info(collidable, col_data)
+                            attack_data.collidables[i] = col_info
                         end
 
-                        if not attack_data.cache then
-                            attack_data.shape_count = misc.add_count(attack_data.shape_count, shape_name)
+                        col_data.info = col_info
+                        utilities.update_collidable(col_data)
+
+                        if not col_data.enabled or not col_data.updated then
+                            goto next
+                        end
+
+                        am_data.active_count = am_data.active_count + 1
+                        am_data.shape_count = misc.add_count(am_data.shape_count, col_info.shape_name)
+
+                        if col_info.is_windbox then
+                            am_data.windbox_count = am_data.windbox_count + 1
+                        end
+
+                        if col_info.is_frontal then
+                            am_data.frontal_count = am_data.frontal_count + 1
+                        end
+
+                        if not misc.table_contains(am_data.attack_condition_types, col_info.attack_condition_name) then
+                            table.insert(am_data.attack_condition_types, col_info.attack_condition_name)
                         end
 
                         if (
-                            config.current['ignore_' .. att_cond_name]
+                            config.current[string.format("ignore_%s", col_info.attack_condition_name)]
                             or (
-                                windbox
+                                col_info.is_windbox
                                 and config.current.ignore_windbox
                             ) or (
-                                  frontal
+                                  col_info.is_frontal
                                   and config.current.ignore_frontal
                               )
                         ) then
-                            ignore_monitor = true
                             goto next
                         end
 
                         if not config.current.hitbox_use_single_color then
-                            if att.parent.prop then
-                                col_data.color = config.current.prop_color
-                            elseif att.parent.enemy then
-                                if att.parent.enemy.boss then
-                                    col_data.color = config.current.big_monster_color
-                                else
-                                    col_data.color = config.current.small_monster_color
-                                end
-                            elseif att.parent.player then
-                                col_data.color = config.current.player_color
-                            elseif att.parent.otomo then
-                                col_data.color = config.current.otomo_color
-                            elseif att.parent.creature then
-                                col_data.color = config.current.creature_color
-                            end
+                            col_data.color = color
 
-                            if windbox and config.current.enable_windbox_color then
+                            if col_info.is_windbox and config.current.enable_windbox_color then
                                 col_data.color = config.current.windbox_color
                             end
 
-                            if frontal and config.current.enable_frontal_color then
+                            if col_info.is_frontal and config.current.enable_frontal_color then
                                 col_data.color = config.current.frontal_color
                             end
 
@@ -385,55 +280,37 @@ function hitboxes.get()
                                 col_data.color = config.current.unguardable_color
                             end
 
-                            if att_cond_name and att_cond_name ~= 'None' and config.current['enable_' .. att_cond_name .. '_color'] then
-                                col_data.color = config.current[att_cond_name .. '_color']
+                            if (
+                                col_info.attack_condition_name
+                                and col_info.attack_condition_name ~= 'None'
+                                and config.current[string.format("enable_%s_color", col_info.attack_condition_name)]
+                            ) then
+                                col_data.color = config.current[string.format("%s_color", col_info.attack_condition_name)]
                             end
                         end
 
-                        table.insert(att.collidables, col_data)
-
-                        utilities.update_collidable(col_data)
-
-                        if col_data.enabled and col_data.updated then
-                            table.insert(drawing.cache, col_data)
-                        end
+                        table.insert(attack.collidables, col_data)
+                        table.insert(drawing.cache, col_data)
 
                         ::next::
                     end
 
-                    if not config.current.pause_monitor and not attack_data.cache then
+                    if not attack_data.cache and #attack.collidables ~= 0 then
+                        attacks_cache[attack.key] = attack_data
+                        -- attack_data.cache = true
+                    end
 
-                        attack_data.ele_mod = att.rs_data:get_field('<SubRate>k__BackingField')
-                        attack_data.ele_mod = attack_data.ele_mod and attack_data.ele_mod or not attack_data.ele_mod and "None"
-                        attack_data.debuff_mod = att.rs_data:get_field('<DebuffRate>k__BackingField')
-                        attack_data.debuff_mod = attack_data.debuff_mod and attack_data.debuff_mod or not attack_data.debuff_mod and 'None'
-                        attack_data.id = attack_data.id and attack_data.id or not attack_data.id and 'None'
-                        attack_data.condition = table.concat(attack_data.att_cond_types, "\n")
-                        attack_data.power = att.rs_data._Power
-                        attack_data.shape_count = misc.join_table(attack_data.shape_count)
-                        attack_data.element = data.element_id[tostring(att.rs_data:get_field('<AttackElement>k__BackingField'))]
-                        attack_data.element_value = att.rs_data._BaseAttackElement
-                        attack_data.debuff_value = att.rs_data:get_field('<DebuffValue>k__BackingField')
-                        attack_data.debuff_1 = data.debuff_id[tostring(att.rs_data:get_field('<DebuffType>k__BackingField'))]
-                        attack_data.sharpness = data.sharpness_id[tostring(att.rs_data:get_field('<SharpnessType>k__BackingField'))]
-                        attack_data.guardable = data.guard_id[attack_data.guardable]
-                        attack_data.start_delay = att.rs_data._HitStartDelay
-                        attack_data.end_delay = att.rs_data._HitStartDelay
-
-                        if not ignore_monitor then
-                            table.insert(data.monitor, 1, attack_data)
-                            attacks_cache[attack_data.parent .. attack_data.id .. attack_data.name] = attack_data
-                        end
-
-                    elseif not config.current.pause_monitor and attack_data.cache and not ignore_monitor then
-                        table.insert(data.monitor, 1, attack_data)
+                    if not config.current.pause_monitor and #attack.collidables ~= 0 then
+                        am_data.shape_count = misc.join_table(am_data.shape_count)
+                        am_data.attack_condition_types = table.concat(am_data.attack_condition_types, "\n")
+                        table.insert(data.monitor, 1, {attack_data, am_data})
                     end
 
                     if #data.monitor > 2 * config.max_table_size then
                         misc.table_remove(
                             data.monitor,
                             function(t, i, j)
-                                if i > config.current.table_size then
+                                if i > config.max_table_size then
                                     return false
                                 else
                                     return true
@@ -442,18 +319,12 @@ function hitboxes.get()
                         )
                     end
                 else
-                    local alive = false
-                    for _, collidable in pairs(att.collidables) do
+                    for _, collidable in pairs(attack.collidables) do
                         utilities.update_collidable(collidable)
 
                         if collidable.enabled and collidable.updated then
-                            alive = true
                             table.insert(drawing.cache, collidable)
                         end
-                    end
-
-                    if not alive then
-                        attacks[idx] = nil
                     end
                 end
             end

@@ -9,14 +9,7 @@ data.master_player = {
     pos=Vector3f.new(0, 0, 0)
 }
 data.valid_shapes = {1, 2, 3, 4, 5}
-data.valid_custom_shapes = {0, 1, 4}
-data.dummy_shapes = {
-    Sphere={Vector3f.new(0, 1, 0), 2},
-    Cylinder={Vector3f.new(-1, 2, 0), Vector3f.new(3, 1 ,0), 2},
-    Capsule={Vector3f.new(-1, 2 ,0), Vector3f.new(3, 1, 0), 2},
-    Box={Vector3f.new(0, 2 ,0), Vector3f.new(3, 1, 2)},
-    Ring={Vector3f.new(-1, 3, 0), Vector3f.new(1, 1 ,0), 4, 0.5},
-}
+data.valid_custom_shapes = {0, 1, 3, 4}
 data.damage_types = {
     names={},
     ids={},
@@ -31,6 +24,16 @@ data.guard_id = {
     [0]='Yes',
     [1]='Skill',
     [2]='No'
+}
+data.damage_elements = {
+    'Slash',
+    'Strike',
+    'Shell',
+    'Fire',
+    'Water',
+    'Ice',
+    'Elect',
+    'Dragon'
 }
 data.monitor = {}
 data.hurtbox_monitor = {}
@@ -50,11 +53,12 @@ local function get_fields(type_def, write_to_config, t, write_color, ignore)
 
     for _, field in pairs(fields) do
         local name = field:get_name()
+
         if ignore and misc.table_contains(ignore,name) then
             goto continue
         end
-        local data = field:get_data()
 
+        local data = field:get_data()
         if name ~= 'Max' and name ~= 'value__' then
             if write_to_config then
                 config.default['ignore_' .. name] = false
@@ -71,6 +75,7 @@ local function get_fields(type_def, write_to_config, t, write_color, ignore)
                 t[tostring(data)] = name
             end
         end
+
         ::continue::
     end
 
@@ -88,6 +93,7 @@ end
 function data.init()
     config = require("AHBD.config")
     misc = require("AHBD.misc")
+
     get_fields('snow.hit.SharpnessType', false, data.sharpness_id)
     get_fields('snow.hit.AttackElement', false, data.element_id)
     get_fields('snow.hit.DamageType', true, data.damage_types)

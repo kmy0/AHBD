@@ -74,34 +74,36 @@ function utilities.get_all_transfroms()
     return scene:call("findComponents(System.Type)", sdk.typeof("via.Transform"))
 end
 
-function utilities.get_shape_type(collidable)
-    local shape = collidable:get_TransformedShape()
-    return shape:get_ShapeType()
-end
-
 function utilities.get_parent_data(char_type,char_base)
     local char = {}
     if char_type == 0 then      --player
-        char.player = true
+
+        char.type = 'player'
         char.id = char_base:getPlayerIndex()
+
         if char.id == data.master_player.id then
             char.master_player = true
         else
             char.servant = char_base:checkServant(char.id)
         end
+
     elseif char_type == 1 then      --enemy
-        char.enemy = {
-            boss=char_base:get_isBossEnemy()
-        }
+
+        char.type = char_base:get_isBossEnemy() and 'bossenemy' or 'smallenemy'
         char.id = char_base:get_EnemyType()
+
     elseif char_type == 2 then      --otomo
-        char.otomo = true
+
+        char.type = 'otomo'
         local otomo_quest_param = char_base:get_OtQuestParam()
         char.id = otomo_quest_param:get_OtomoID()
         char.servant = char_base:get_IsServantOtomo()
+
     elseif char_type == 5 then      --envcreature
-        char.creature = true
+
+        char.type = 'creature'
     end
+
     char.base = char_base
     char.distance = 0
     char.meat = {}
@@ -109,7 +111,6 @@ function utilities.get_parent_data(char_type,char_base)
 end
 
 function utilities.update_hitzones(t)
-
     if next(t.meat) == nil then return end
 
     if not t.hitzones then
@@ -147,11 +148,9 @@ function utilities.update_objects()
             if data.char_objects[base] and not utilities.is_only_my_ref(base) then
 
                 if (
-                    data.char_objects[base].enemy
-                    and data.char_objects[base].enemy.boss
+                    data.char_objects[base].type == 'bossenemy'
                     or (
-                        data.char_objects[base].enemy
-                        and not data.char_objects[base].enemy.boss
+                        data.char_objects[base].type == 'smallenemy'
                         and not data.char_objects[base].hitzones
                     )
                 ) then
@@ -174,64 +173,87 @@ function utilities.update_objects()
             ::next::
         end
 
-        data.to_update = misc.table_copy(data.updated)
+        data.to_update = data.updated
         data.updated = {}
+    end
+end
+
+function utilities.check_custom_shape(collidable, userdata)
+    local custom_shape_type = userdata._CustomShapeType
+    local shape_type
+
+    if custom_shape_type and custom_shape_type ~= 0 then
+        -- if not misc.table_contains(data.valid_custom_shapes, custom_shape_type) then
+        --     if not misc.table_contains(config.current.missing_custom_shapes, custom_shape_type) then
+        --         table.insert(config.current.missing_custom_shapes, custom_shape_type)
+        --     end
+        -- end
+
+        return true, custom_shape_type
+    else
+        shape_type = collidable.shape:get_ShapeType()
+        -- if not misc.table_contains(data.valid_shapes, shape_type) then
+        --     if not misc.table_contains(config.current.missing_shapes, shape_type) then
+        --         table.insert(config.current.missing_shapes, shape_type)
+        --     end
+        -- end
+
+        return false, shape_type
     end
 end
 
 function utilities.update_collidable(collidable)
     collidable.enabled = collidable.col:get_Enabled()
+
     if collidable.enabled then
-        local shape = collidable.col:get_TransformedShape()
+
+        local shape = collidable.shape
         if shape then
-            if collidable.shape_type then
-                if collidable.shape_type == 3 or collidable.shape_type == 4 then --Capsule
+            if collidable.info.shape_type then
+                if collidable.info.shape_type == 3 or collidable.info.shape_type == 4 then --Capsule, ContinuousCapsule
 
-                    if collidable.shape_type == 4 then --ContinuousCapsule
-                        shape = shape:get_Capsule()
-                        collidable.pos_a = shape:get_StartPosition()
-                        collidable.pos_b = shape:get_EndPosition()
-                    else
-                        collidable.pos_a = shape:get_PosA()
-                        collidable.pos_b = shape:get_PosB()
-                    end
+                    shape = shape:get_Capsule()
+                    collidable.pos_a = shape.p0
+                    collidable.pos_b = shape.p1
+                    collidable.radius = shape.r
+                    collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
 
-                    collidable.radius = shape:get_Radius()
-                    local center = collidable.pos_a + collidable.pos_b
-                    collidable.pos = Vector3f.new(center.x / 2, center.y / 2, center.z / 2)
+                elseif collidable.info.shape_type == 1 or collidable.info.shape_type == 2 then --Sphere, ContinuousSphere
 
-                elseif collidable.shape_type == 1 or collidable.shape_type == 2 then --Sphere
-                    if collidable.shape_type == 2 then --ContinuousSphere
-                        shape = shape:get_Sphere()
-                    end
+                    shape = shape:get_Sphere()
+                    collidable.radius = shape.r
+                    collidable.pos = shape.pos
 
-                    collidable.radius = shape:get_Radius()
-                    collidable.pos = shape:get_Center()
+                elseif collidable.info.shape_type == 5 then --Box
 
-                elseif collidable.shape_type == 5 then --Box
-                    local obb = shape:get_Box()
-
-                    collidable.pos = obb:get_Position()
-                    collidable.extent = obb:get_Extent()
+                    shape = shape:get_Box()
+                    collidable.pos = shape:get_Position()
+                    collidable.extent = shape.extent
 
                 end
             else
-                if collidable.custom_shape_type == 1 then --Cylinder
+                if collidable.info.custom_shape_type == 1 then --Cylinder
 
-                    collidable.pos_a = shape:get_PosA()
-                    collidable.pos_b = shape:get_PosB()
-                    collidable.radius = shape:get_Radius()
-                    local center = collidable.pos_a + collidable.pos_b
-                    collidable.pos = Vector3f.new(center.x / 2, center.y / 2, center.z / 2)
+                    shape = shape:get_Capsule()
+                    collidable.pos_a = shape.p0
+                    collidable.pos_b = shape.p1
+                    collidable.radius = shape.r
+                    collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
 
-                elseif collidable.custom_shape_type == 4 then --Donut
+                elseif collidable.info.custom_shape_type == 3 then --TrianglePole without Triangle Pole :)) Only Somnacanths flash uses that
 
-                    collidable.pos_a = shape:get_PosA()
-                    collidable.pos_b = shape:get_PosB()
-                    collidable.radius = shape:get_Radius()
-                    collidable.ring_radius = collidable.userdata:get_RingRadius()
-                    local center = collidable.pos_a + collidable.pos_b
-                    collidable.pos = Vector3f.new(center.x / 2, center.y / 2, center.z / 2)
+                    shape = shape:get_Box()
+                    collidable.pos = shape:get_Position()
+                    collidable.extent = shape.extent
+
+                elseif collidable.info.custom_shape_type == 4 then --Donut
+
+                    shape = shape:get_Capsule()
+                    collidable.pos_a = shape.p0
+                    collidable.pos_b = shape.p1
+                    collidable.radius = shape.r
+                    collidable.ring_radius = collidable.info.userdata:get_RingRadius()
+                    collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
 
                 end
             end

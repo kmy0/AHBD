@@ -59,20 +59,25 @@ function misc.join_table(t)
     return str
 end
 
-function misc.get_nested_table(t, name)
-    if not t[name] then
-        t[name] = {}
+function misc.get_nested_table(t, ...)
+    local keys = { ... }
+
+    for i=1, #keys do
+        local key = tostring(keys[i])
+
+        if not t[key] then
+            t[key] = {}
+        end
+
+        t = t[key]
     end
-    return t[name]
+
+    return t
 end
 
-function misc.set_nested_table(t, name, key, value)
-    if not t then t = {} end
-    if not t[name] then
-        t[name] = {}
-    end
-    t[name][key] = value
-    return t
+function misc.set_nested_value(t, value, ...)
+    local t = misc.get_nested_table(t, ...)
+    t = value
 end
 
 function misc.table_deep_copy(original, copies)
@@ -124,6 +129,10 @@ function misc.table_merge(...)
     end
 
     return result;
+end
+
+function misc.starts_with(str, pattern)
+   return string.sub(str, 1, string.len(pattern)) == pattern
 end
 
 return misc

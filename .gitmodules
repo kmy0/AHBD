@@ -1,6 +1,6 @@
 [submodule "ahbd_draw/dependencies/imgui"]
-    path = ahbd_draw/dependencies/imgui
-    url = https://github.com/ocornut/imgui.git
+	path = ahbd_draw/dependencies/imgui
+	url = https://github.com/ocornut/imgui.git
 [submodule "ahbd_draw/dependencies/glm"]
-    path = ahbd_draw/dependencies/glm
-    url = https://github.com/g-truc/glm.git
+	path = ahbd_draw/dependencies/glm
+	url = https://github.com/g-truc/glm.git

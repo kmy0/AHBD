@@ -38,7 +38,7 @@ local function get_attack_data(attack)
     attack_data.name = attack.rs_data:ToString()
     attack_data.motion_value = attack.rs_data._BaseDamage
     attack_data.damage_type = attack.rs_data._DamageType
-    attack_data.damage_type_name = data.damage_types.ids[tostring(attack_data.damage_type)]
+    attack_data.damage_type_name = data.damage_types.ids[attack_data.damage_type]
     attack_data.guardable = attack.rs_data:get_GuardableType()
     attack_data.col_count = attack.rsc_controller:getNumCollidables(attack.res_idx, attack.rs_id)
     attack_data.ele_mod = attack.rs_data['<SubRate>k__BackingField']
@@ -47,11 +47,11 @@ local function get_attack_data(attack)
     attack_data.debuff_mod = attack_data.debuff_mod or 'None'
     attack_data.id = attack.parent.id or "None"
     attack_data.power = attack.rs_data._Power
-    attack_data.element = data.element_id[tostring(attack.rs_data['<AttackElement>k__BackingField'])]
+    attack_data.element = data.element_id[attack.rs_data['<AttackElement>k__BackingField']]
     attack_data.element_value = attack.rs_data._BaseAttackElement
     attack_data.debuff_value = attack.rs_data['<DebuffValue>k__BackingField']
-    attack_data.debuff_1 = data.debuff_id[tostring(attack.rs_data['<DebuffType>k__BackingField'])]
-    attack_data.sharpness = data.sharpness_id[tostring(attack.rs_data['<SharpnessType>k__BackingField'])]
+    attack_data.debuff_1 = data.debuff_id[attack.rs_data['<DebuffType>k__BackingField']]
+    attack_data.sharpness = data.sharpness_id[attack.rs_data['<SharpnessType>k__BackingField']]
     attack_data.guardable = data.guard_id[attack_data.guardable]
     attack_data.start_delay = attack.rs_data._HitStartDelay
     attack_data.end_delay = attack.rs_data._HitStartDelay
@@ -72,7 +72,7 @@ local function get_collidable_info(collidable, col_data)
         col_info.attack_condition = 0
     end
 
-    col_info.attack_condition_name = data.att_cond_match_hit_attr.ids[tostring(col_info.attack_condition)]
+    col_info.attack_condition_name = data.att_cond_match_hit_attr.ids[col_info.attack_condition]
     if not col_info.attack_condition_name then
         col_info.attack_condition_name = 'Invalid'
     end
@@ -81,10 +81,10 @@ local function get_collidable_info(collidable, col_data)
 
     if is_custom then
         col_info.custom_shape_type = shape_type
-        col_info.shape_name = data.custom_shape_id[tostring(shape_type)]
+        col_info.shape_name = data.custom_shape_id[shape_type]
     else
         col_info.shape_type = shape_type
-        col_info.shape_name = data.shape_id[tostring(shape_type)]
+        col_info.shape_name = data.shape_id[shape_type]
     end
 
     return col_info
@@ -107,14 +107,21 @@ function hitboxes.get_attacks(args)
 
                 if char_type == 4 then      --shell
                     char_base = char_base:get_OwnerObject()
-                    char_obj = data.char_objects[char_base]
 
-                    if not char_obj then
-                        char_type = char_base:getCharacterType()
-                        data.char_objects[char_base] = utilities.get_parent_data(char_type,char_base)
-                        parent = data.char_objects[char_base]
+                    if char_base then
+                        char_obj = data.char_objects[char_base]
+
+                        if not char_obj then
+                            char_type = char_base:getCharacterType()
+                            data.char_objects[char_base] = utilities.get_parent_data(char_type,char_base)
+                            parent = data.char_objects[char_base]
+                        else
+                            parent = char_obj
+                        end
                     else
-                        parent = char_obj
+                        parent = {}
+                        parent.type = 'prop'
+                        parent.distance = 0
                     end
                 else
                     data.char_objects[char_base] = utilities.get_parent_data(char_type,char_base)
@@ -132,7 +139,7 @@ function hitboxes.get_attacks(args)
         end
     end
 
-     if not config.current[string.format('ignore_%s', parent.type)] then
+    if parent and not config.current[string.format('ignore_%s', parent.type)] then
         local res_idx = sdk.to_int64(args[5]) & 0xFF
         local rs_id = sdk.to_int64(args[6]) & 0xFF
         local key = string.format("%i|%i|%i", rsc_controller:get_address(), res_idx, rs_id)
@@ -231,12 +238,6 @@ function hitboxes.get()
                         end
 
                         col_data.info = col_info
-                        utilities.update_collidable(col_data)
-
-                        if not col_data.enabled or not col_data.updated then
-                            goto next
-                        end
-
                         am_data.active_count = am_data.active_count + 1
                         am_data.shape_count = misc.add_count(am_data.shape_count, col_info.shape_name)
 
@@ -290,7 +291,12 @@ function hitboxes.get()
                         end
 
                         table.insert(attack.collidables, col_data)
-                        table.insert(drawing.cache, col_data)
+
+                        utilities.update_collidable(col_data)
+
+                        if col_data.enabled and col_data.updated then
+                            table.insert(drawing.cache, col_data)
+                        end
 
                         ::next::
                     end

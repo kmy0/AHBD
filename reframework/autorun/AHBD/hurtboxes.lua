@@ -7,18 +7,19 @@ local utilities
 local data
 
 local enemy_hitzone_status = {}
-local hurtbox_cache = {}
 local to_draw = {}
 local to_load = {}
 local update_count = 0
 
 
-local function create_hurtbox_monitor_entry(name, group, parent, meat, part_group)
-    if not data.hurtbox_monitor[name] or not data.hurtbox_monitor[name].groups[group] then
+local function create_hurtbox_monitor_entry(name, internal_name, parent, meat, part_group)
+    if not data.hurtbox_monitor[name] or not data.hurtbox_monitor[name].groups[meat] then
         local entry = {
             visible=true,
             highlight=false,
             meat=meat,
+            part_name=utilities.get_part_name(meat, parent.id) or internal_name or "???",
+            internal_name=internal_name,
             part_group=part_group,
             collidables={}
         }
@@ -26,28 +27,26 @@ local function create_hurtbox_monitor_entry(name, group, parent, meat, part_grou
         if not data.hurtbox_monitor[name] then
             data.hurtbox_monitor[name] = {
                 groups={
-                    [group]=entry
+                    [meat]=entry
                 },
                 parent=parent,
                 real_name=utilities.get_monster_name(parent.id)
             }
         else
-            data.hurtbox_monitor[name].groups[group] = entry
+            data.hurtbox_monitor[name].groups[meat] = entry
         end
     end
 
-    return data.hurtbox_monitor[name].groups[group]
+    return data.hurtbox_monitor[name].groups[meat]
 end
 
-local function add_collidable(name, col, parent, meat, group, part_group)
+local function add_collidable(name, col, parent, meat, internal_name, part_group)
     local col_data = {
         parent=parent,
         col=col,
         color=config.current.hurtbox_color,
         sort=0,
-        group=group,
         part_group=part_group,
-        name=name,
         meat=meat,
         pos=Vector3f.new(0, 0, 0),
         distance=0,
@@ -62,16 +61,16 @@ local function add_collidable(name, col, parent, meat, group, part_group)
     local is_custom, shape_type = utilities.check_custom_shape(col_data, col_data.info.userdata)
     if is_custom then
         col_data.info.custom_shape_type = shape_type
-        col_data.info.shape_name = data.custom_shape_id[tostring(shape_type)]
+        col_data.info.shape_name = data.custom_shape_id[shape_type]
     else
         col_data.info.shape_type = shape_type
-        col_data.info.shape_name = data.shape_id[tostring(shape_type)]
+        col_data.info.shape_name = data.shape_id[shape_type]
     end
 
     table.insert(misc.get_nested_table(to_draw, string.format("%s%s", parent.master_player and "master" or "", parent.type), name), col_data)
 
     if parent.type == 'bossenemy'then
-        table.insert(create_hurtbox_monitor_entry(name, group, parent, meat, part_group).collidables, col_data)
+        table.insert(create_hurtbox_monitor_entry(name, internal_name, parent, meat, part_group).collidables, col_data)
     end
 end
 
@@ -138,11 +137,11 @@ local function load_hurtboxes()
                             end
 
                             local meat = userdata:get_Meat()
-                            local group = parent_userdata:get_Name()
+                            local internal_name = parent_userdata:get_Name()
                             local part_group = parent_userdata:get_Group()
 
-                            misc.set_nested_value(parent.meat, true, meat, part_group)
-                            add_collidable(name, col, parent, meat, group, part_group)
+                            misc.set_nested_value(parent.meat, part_group, true, meat)
+                            add_collidable(name, col, parent, meat, internal_name, part_group)
                         end
                     end
 
@@ -171,7 +170,7 @@ function hurtboxes.get_char_base_in_quest()
         if rsc then
             local char_base = utilities.get_component(game_object, 'snow.CharacterBase')
 
-            if char_base then
+            if char_base and char_base:get_Started() then
                 local parent = create_parent_data(char_base)
 
                 if parent then
@@ -251,11 +250,11 @@ function hurtboxes.get()
                         goto next_col
                     end
 
-                    if data.hurtbox_monitor[game_object_name] and not data.hurtbox_monitor[game_object_name].groups[col.group].visible then
+                    if data.hurtbox_monitor[game_object_name] and not data.hurtbox_monitor[game_object_name].groups[col.meat].visible then
                         goto next_col
                     end
 
-                    if data.hurtbox_monitor[game_object_name] and data.hurtbox_monitor[game_object_name].groups[col.group].highlight then
+                    if data.hurtbox_monitor[game_object_name] and data.hurtbox_monitor[game_object_name].groups[col.meat].highlight then
                         col.color = config.current.hurtbox_highlight_color
                     else
                         if not config.current.hurtbox_use_single_color then
@@ -266,18 +265,16 @@ function hurtboxes.get()
 
                         if (col.parent.type == 'bossenemy' or col.parent.type == 'smallenemy') and next(config.current.hitzone_conditions) then
 
-                            if enemy_hitzone_status[col.group] then
-                                if enemy_hitzone_status[col.group].ignore then
+                            if enemy_hitzone_status[col.meat] then
+                                if enemy_hitzone_status[col.meat].ignore then
                                     goto next_col
-                                elseif enemy_hitzone_status[col.group].color then
-                                    col.color = enemy_hitzone_status[col.group].color
+                                elseif enemy_hitzone_status[col.meat].color then
+                                    col.color = enemy_hitzone_status[col.meat].color
                                 end
                             else
-                                local meat = tostring(col.meat)
-
-                                if col.parent.hitzones and col.parent.hitzones[meat] then
-                                    enemy_hitzone_status[col.group] = {}
-                                    local hitzones = col.parent.hitzones[meat][tostring(col.part_group)]
+                                if col.parent.hitzones and col.parent.hitzones[col.meat] then
+                                    enemy_hitzone_status[col.meat] = {}
+                                    local hitzones = col.parent.hitzones[col.meat][col.part_group]
 
                                     for type=1, #data.damage_elements do
                                         local conditions = config.raw_hitzone_conditions[type]
@@ -288,10 +285,10 @@ function hurtboxes.get()
 
                                             if hitzone >= cond.from and hitzone <= cond.to then
                                                 if cond.ignore then
-                                                    enemy_hitzone_status[col.group].ignore = true
+                                                    enemy_hitzone_status[col.meat].ignore = true
                                                     goto next_col
                                                 else
-                                                    enemy_hitzone_status[col.group].color = cond.color
+                                                    enemy_hitzone_status[col.meat].color = cond.color
                                                     col.color = cond.color
                                                     goto exit
                                                 end

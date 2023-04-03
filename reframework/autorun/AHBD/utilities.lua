@@ -191,7 +191,7 @@ function utilities.check_custom_shape(collidable, userdata)
 
         return true, custom_shape_type
     else
-        shape_type = collidable.shape:get_ShapeType()
+        shape_type = collidable.shape:get_ShapeType() --collidable.shape:read_byte(0x20)
         -- if not misc.table_contains(data.valid_shapes, shape_type) then
         --     if not misc.table_contains(config.current.missing_shapes, shape_type) then
         --         table.insert(config.current.missing_shapes, shape_type)
@@ -203,7 +203,7 @@ function utilities.check_custom_shape(collidable, userdata)
 end
 
 function utilities.update_collidable(collidable)
-    collidable.enabled = collidable.col:get_Enabled()
+    collidable.enabled = collidable.col:get_Enabled() --collidable.col:read_byte(0x10) == 3
 
     if collidable.enabled then
 
@@ -252,7 +252,7 @@ function utilities.update_collidable(collidable)
                     collidable.pos_a = shape.p0
                     collidable.pos_b = shape.p1
                     collidable.radius = shape.r
-                    collidable.ring_radius = collidable.info.userdata:get_RingRadius()
+                    collidable.ring_radius = collidable.info.userdata._RingRadius
                     collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
 
                 end

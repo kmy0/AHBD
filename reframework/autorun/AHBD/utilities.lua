@@ -27,6 +27,40 @@ function utilities.get_monster_name(id)
     return utilities.get_messageman():getEnemyNameMessage(id)
 end
 
+function utilities.get_part_name(meat, em_type)
+    if next(data.monsters) == nil then
+        local guiman = sdk.get_managed_singleton('snow.gui.GuiManager')
+
+        if guiman then
+            local monster_list = guiman:get_refMonsterList()
+
+            if monster_list then
+                local get_message = sdk.find_type_definition("via.gui.message"):get_method("get(System.Guid)")
+                local monster_data_list = monster_list._MonsterBossData._DataList
+
+                for i=0, monster_data_list:get_Count()-1 do
+                    local monster = monster_data_list:get_Item(i)
+                    local em_type = monster._EmType
+                    local monster_part_data = monster._PartTableData
+
+                    for j=0, monster_part_data:get_Count()-1 do
+                        local part = monster_part_data:get_Item(j)
+                        local meat = part._EmPart
+                        local part_type = part._Part
+                        local part_name_guid = monster_list:getMonsterPartName(part_type)
+
+                        misc.set_nested_value(data.monsters, meat, get_message(nil, part_name_guid), em_type)
+                    end
+                end
+            end
+        end
+    end
+
+    if data.monsters[em_type] then
+        return data.monsters[em_type][meat]
+    end
+end
+
 function utilities.get_playman()
     if not data.playman then
         data.playman = sdk.get_managed_singleton("snow.player.PlayerManager")
@@ -76,6 +110,7 @@ end
 
 function utilities.get_parent_data(char_type,char_base)
     local char = {}
+
     if char_type == 0 then      --player
 
         char.type = 'player'
@@ -130,7 +165,7 @@ function utilities.update_hitzones(t)
             end
 
             for i=0, 8 do
-                t.hitzones[meat][group][i+1] = t.base:getMeatAdjustValue(tonumber(meat), i, tonumber(group))
+                t.hitzones[meat][group][i+1] = t.base:getMeatAdjustValue(meat, i, group)
             end
         end
     end

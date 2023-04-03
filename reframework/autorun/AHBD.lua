@@ -34,17 +34,17 @@ re.on_draw_ui(
 re.on_pre_application_entry(
     'BeginRendering',
     function()
-        -- if utilities.is_in_quest() then
-        --     utilities.update_objects()
-        --     hurtboxes.get()
-        --     hitboxes.get()
-        --     dummies.get()
-        --     drawing.draw()
-        -- else
-        --     hitboxes.reset()
-        --     hurtboxes.reset()
-        --     dummies.reset()
-        -- end
+        if utilities.is_in_quest() then
+            utilities.update_objects()
+            hurtboxes.get()
+            hitboxes.get()
+            dummies.get()
+            drawing.draw()
+        else
+            hitboxes.reset()
+            hurtboxes.reset()
+            dummies.reset()
+        end
     end
 )
 
@@ -56,18 +56,6 @@ re.on_frame(
 
         if config_menu.is_opened then
             config_menu.draw()
-        end
-
-        if utilities.is_in_quest() then
-            utilities.update_objects()
-            hurtboxes.get()
-            hitboxes.get()
-            dummies.get()
-            drawing.draw()
-        else
-            hitboxes.reset()
-            hurtboxes.reset()
-            dummies.reset()
         end
     end
 )

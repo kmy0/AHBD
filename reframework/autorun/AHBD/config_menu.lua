@@ -746,8 +746,8 @@ function config_menu.draw()
             end
 
             if popup_yesno('Are you sure?','confirm1') then
-                config.current.big_monster_color = config.current.color
-                config.current.small_monster_color = config.current.color
+                config.current.bossenemy_color = config.current.color
+                config.current.smallenemy_color = config.current.color
                 config.current.otomo_color = config.current.color
                 config.current.player_color = config.current.color
                 config.current.prop_color = config.current.color
@@ -783,10 +783,10 @@ function config_menu.draw()
             end
 
             if popup_yesno('Are you sure?','confirm2') then
-                config.current.hurtbox_big_monster_color = config.current.hurtbox_color
-                config.current.hurtbox_small_monster_color = config.current.hurtbox_color
+                config.current.hurtbox_bossenemy_color = config.current.hurtbox_color
+                config.current.hurtbox_smallenemy_color = config.current.hurtbox_color
                 config.current.hurtbox_otomo_color = config.current.hurtbox_color
-                config.current.hurtbox_master_player_color = config.current.hurtbox_color
+                config.current.hurtbox_masterplayer_color = config.current.hurtbox_color
                 config.current.hurtbox_player_color = config.current.hurtbox_color
                 config.current.hurtbox_creature_color = config.current.hurtbox_color
             end

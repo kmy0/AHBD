@@ -63,7 +63,7 @@ function misc.get_nested_table(t, ...)
     local keys = { ... }
 
     for i=1, #keys do
-        local key = tostring(keys[i])
+        local key = keys[i]
 
         if not t[key] then
             t[key] = {}
@@ -75,9 +75,9 @@ function misc.get_nested_table(t, ...)
     return t
 end
 
-function misc.set_nested_value(t, value, ...)
+function misc.set_nested_value(t, key, value, ...)
     local t = misc.get_nested_table(t, ...)
-    t = value
+    t[key] = value
 end
 
 function misc.table_deep_copy(original, copies)

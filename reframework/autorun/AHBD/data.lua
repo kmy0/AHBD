@@ -17,7 +17,7 @@ data.damage_types = {
 }
 data.att_cond_match_hit_attr = {
     names={None=0},
-    ids={['0']='None'},
+    ids={[0]='None'},
     sort={},
 }
 data.guard_id = {
@@ -45,6 +45,7 @@ data.custom_shape_id = {}
 data.char_objects = {}
 data.to_update = {}
 data.updated = {}
+data.monsters = {}
 
 
 local function get_fields(type_def, write_to_config, t, write_color, ignore)
@@ -64,15 +65,14 @@ local function get_fields(type_def, write_to_config, t, write_color, ignore)
                 config.default['ignore_' .. name] = false
 
                 if write_color then
-                    -- config.default[name .. '_color'] = 1006632960
                     config.default['enable_' .. name .. '_color'] = true
                 end
 
                 t.names[name] = data
-                t.ids[tostring(data)] = name
+                t.ids[data] = name
                 table.insert(t.sort,name)
             else
-                t[tostring(data)] = name
+                t[data] = name
             end
         end
 

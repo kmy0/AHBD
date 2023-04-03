@@ -54,7 +54,7 @@ local function draw_shape(collidable)
     else
         if collidable.info.custom_shape_type == 1 then --Cylinder
 
-            ahbd_draw.capsule_ellipse(
+            ahbd_draw.cylinder(
                 collidable.pos_a,
                 collidable.pos_b,
                 collidable.radius,

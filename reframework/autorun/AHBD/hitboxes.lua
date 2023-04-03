@@ -92,7 +92,7 @@ end
 
 function hitboxes.get_attacks(args)
     local attack_work = sdk.to_managed_object(args[2])
-    local rsc_controller = attack_work:get_RSCCtrl()
+    local rsc_controller = attack_work['<RSCCtrl>k__BackingField']
     local parent = rsc_controllers[rsc_controller]
 
     if not parent then
@@ -176,7 +176,7 @@ function hitboxes.get()
                 goto continue
             end
 
-            local phase = attack.attack_work:get_Phase()
+            local phase = attack.attack_work['<Phase>k__BackingField']
 
             if (
                 phase == 3
@@ -297,7 +297,7 @@ function hitboxes.get()
 
                     if not attack_data.cache and #attack.collidables ~= 0 then
                         attacks_cache[attack.key] = attack_data
-                        -- attack_data.cache = true
+                        attack_data.cache = true
                     end
 
                     if not config.current.pause_monitor and #attack.collidables ~= 0 then

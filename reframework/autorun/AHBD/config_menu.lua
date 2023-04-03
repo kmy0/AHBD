@@ -367,9 +367,7 @@ local function draw_hurtbox_monitor()
 
                 if imgui.begin_table(table_2.name .. i, table_2.col_count, table_2.flags) then
                     local header = nil
-                    local groups = monster.groups
-                    local group_names = sort(groups)
-                    local parent = monster.parent
+                    local group_names = sort(monster.groups)
                     local part_count = 0
 
                     for i, header in ipairs(table_2.headers) do
@@ -381,8 +379,7 @@ local function draw_hurtbox_monitor()
                     for row=0, #group_names-1 do
                         local shape_count = {}
                         local count = 0
-                        local group_name = group_names[row+1]
-                        local group = groups[group_name]
+                        local group = monster.groups[group_names[row+1]]
                         local collidables = group.collidables
 
                         for i, v in pairs(collidables) do
@@ -393,7 +390,7 @@ local function draw_hurtbox_monitor()
 
                             if v.enabled then
                                 count = count + 1
-                                shape_count = misc.add_count(shape_count, data.shape_id[tostring(v.info.shape_type)])
+                                shape_count = misc.add_count(shape_count, data.shape_id[v.info.shape_type])
                             end
 
                             ::next::
@@ -404,8 +401,8 @@ local function draw_hurtbox_monitor()
                             part_count = part_count + 1
 
                             group.hitzones = {}
-                            if parent.hitzones and parent.hitzones[tostring(group.meat)] then
-                                for hitzone, value in ipairs(parent.hitzones[tostring(group.meat)][tostring(group.part_group)]) do
+                            if monster.parent.hitzones and monster.parent.hitzones[group.meat] then
+                                for hitzone, value in ipairs(monster.parent.hitzones[group.meat][group.part_group]) do
                                     group.hitzones[hitzone] = value
                                 end
                             end
@@ -417,7 +414,7 @@ local function draw_hurtbox_monitor()
 
                                 if header == 'Part Name' then
                                     imgui.push_font(window.font)
-                                    imgui.text(group_name)
+                                    imgui.text(group.part_name)
                                     imgui.pop_font()
                                 elseif header == 'Visible' then
                                     imgui.spacing()
@@ -459,7 +456,7 @@ local function draw_hurtbox_monitor()
                         end
                     end
 
-                    if part_count == 0 then
+                    if part_count == 0 and not monster.parent.base:isDispIconMiniMap() then
                         data.hurtbox_monitor[game_object_name] = nil
                     end
 

@@ -220,7 +220,14 @@ function hurtboxes.get()
 
         for parent_name, parent_data in pairs(to_draw) do
 
-            if config.current[string.format("ignore_hurtbox_%s", parent_name)] then
+            if (
+                config.current[string.format("ignore_hurtbox_%s", parent_name)]
+                or (
+                    parent_name == 'masterplayer'
+                    and config.current.hide_when_invulnerable
+                    and data.master_player.obj:checkMuteki()
+                )
+            ) then
                 goto next_parent
             end
 
@@ -229,6 +236,7 @@ function hurtboxes.get()
                 if parent_name == 'bossenemy' or parent_name == 'smallenemy' then
                     enemy_hitzone_status = {}
                 end
+
 
                 local color = config.current[string.format("hurtbox_%s_color", parent_name)]
                 for idx, col in pairs(cols) do

@@ -84,27 +84,6 @@ local function create_parent_data(char_base)
     return data.char_objects[char_base]
 end
 
-local function get_char_base(args)
-    if config.current.enabled_hurtboxes then
-        local char_base = sdk.to_managed_object(args[2])
-        local game_object = char_base:get_GameObject()
-        local rsc = utilities.get_component(game_object, 'via.physics.RequestSetCollider')
-
-        if not rsc then return end
-
-        local parent = create_parent_data(char_base)
-
-        if parent then
-            parent.rsc = rsc
-            data.to_update[char_base] = true
-            table.insert(to_load, {
-                parent=parent,
-                name=game_object:get_Name() .. '@' .. game_object:get_address()
-            })
-        end
-    end
-end
-
 local function load_hurtboxes()
     update_count = 0
 

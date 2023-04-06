@@ -34,6 +34,7 @@ local dummy_shapes = {
     Box={
         pos = Vector3f.new(0, 2 ,0),
         extent = Vector3f.new(3, 1, 2),
+        rot = Vector3f.new(0, 0, 0),
         info = {
             shape_type = 5
         }
@@ -45,6 +46,14 @@ local dummy_shapes = {
         ring_radius = 0.5,
         info = {
             custom_shape_type = 4
+        }
+    },
+    Triangle={
+        pos = Vector3f.new(0, 2 ,0),
+        extent = Vector3f.new(3, 1, 2),
+        rot = Vector3f.new(0, 0, 0),
+        info = {
+            custom_shape_type = 3
         }
     }
 }
@@ -76,7 +85,7 @@ function dummies.spawn(shape_name)
     local player_pos = utilities.get_player_pos()
 
     if player_pos then
-        if shape_name == 'Sphere' or shape_name == 'Box' then
+        if shape_name == 'Sphere' or shape_name == 'Box' or shape_name == 'Triangle' then
             col_data.pos =  col_data.pos + player_pos
         else
             col_data.pos_a = col_data.pos_a + player_pos

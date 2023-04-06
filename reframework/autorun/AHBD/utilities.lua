@@ -263,6 +263,7 @@ function utilities.update_collidable(collidable)
 
                     shape = shape:get_Box()
                     collidable.pos = shape:get_Position()
+                    collidable.rot = shape:get_RotateAngle()
                     collidable.extent = shape.extent
 
                 end
@@ -275,10 +276,11 @@ function utilities.update_collidable(collidable)
                     collidable.radius = shape.r
                     collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
 
-                elseif collidable.info.custom_shape_type == 3 then --TrianglePole without Triangle Pole :)) Only Somnacanths flash uses that
+                elseif collidable.info.custom_shape_type == 3 then --TrianglePole
 
                     shape = shape:get_Box()
                     collidable.pos = shape:get_Position()
+                    collidable.rot = shape:get_RotateAngle()
                     collidable.extent = shape.extent
 
                 elseif collidable.info.custom_shape_type == 4 then --Donut

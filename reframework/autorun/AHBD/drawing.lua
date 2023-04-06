@@ -46,10 +46,12 @@ local function draw_shape(collidable)
             ahbd_draw.box(
                 collidable.pos,
                 collidable.extent,
+                collidable.rot,
                 collidable.color,
                 config.current.show_outline,
                 config.current.outline_color
             )
+
         end
     else
         if collidable.info.custom_shape_type == 1 then --Cylinder
@@ -66,9 +68,10 @@ local function draw_shape(collidable)
 
         elseif collidable.info.custom_shape_type == 3 then --TrianglePole
 
-            ahbd_draw.box(
+            ahbd_draw.triangle(
                 collidable.pos,
                 collidable.extent,
+                collidable.rot,
                 collidable.color,
                 config.current.show_outline,
                 config.current.outline_color

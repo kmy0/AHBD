@@ -108,6 +108,7 @@ void on_lua_state_created(lua_State* l) {
     ahbd_draw["cylinder"] = draw::cylinder;
     ahbd_draw["ring"] = draw::ring;
     ahbd_draw["box"] = draw::box;
+    ahbd_draw["triangle"] = draw::triangle;
     ahbd_draw["capsule_ellipse"] = draw::capsule_ellipse;
     ahbd_draw["capsule_quad"] = draw::capsule_quad;
     ahbd_draw["sphere"] = draw::sphere;

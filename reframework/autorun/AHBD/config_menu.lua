@@ -118,7 +118,8 @@ local spawn_combo = {
     'Cylinder',
     'Capsule',
     'Box',
-    'Ring'
+    'Ring',
+    'Triangle'
 }
 local colors = {
     bad=0xff1947ff,

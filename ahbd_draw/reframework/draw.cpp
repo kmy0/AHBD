@@ -42,7 +42,7 @@ std::optional<cap::body> _get_capsule_body(const Vector3f& start, const Vector3f
         const auto bottom_circle_start = std::get<1>(*bottom_screen_radius);
 
         if (top_screen_radius && bottom_screen_radius) {
-            std::vector<Vector2f> corners(4);
+            std::vector<ImVec2> corners(4);
             const auto delta = glm::normalize(bottom_circle_start - top_circle_start);
             const auto angle = glm::atan(delta.y, delta.x) + glm::radians(90.0f);
 
@@ -93,8 +93,8 @@ cyl::bases _cylinder(
     up = glm::normalize(up) * radius;
     right = glm::normalize(right) * radius;
 
-    auto get_bases = [&](const Vector3f& pos, int num_segments) -> std::optional<std::vector<Vector2f>> {
-        std::vector<Vector2f> points;
+    auto get_bases = [&](const Vector3f& pos, int num_segments) -> std::optional<std::vector<ImVec2>> {
+        std::vector<ImVec2> points;
         const float angle_increment = glm::radians(360.0f) / num_segments;
 
         for (int i = 0; i <= num_segments; i++) {
@@ -108,7 +108,7 @@ cyl::bases _cylinder(
                 return std::nullopt;
             }
 
-            points.push_back(*point);
+            points.push_back(*(ImVec2*)&*point);
         }
 
         return points;
@@ -133,10 +133,10 @@ cyl::bases _cylinder(
     // body
     for (int i = 0; i < size; i += 1) {
         ImGui::GetBackgroundDrawList()->AddQuadFilled(
-            *(ImVec2*)&top_points[i],
-            *(ImVec2*)&top_points[i + 1],
-            *(ImVec2*)&bottom_points[i + 1],
-            *(ImVec2*)&bottom_points[i],
+            top_points[i],
+            top_points[i + 1],
+            bottom_points[i + 1],
+            bottom_points[i],
             color
         );
     }
@@ -145,18 +145,18 @@ cyl::bases _cylinder(
     if (type == cyl::type::cylinder) {
         for (int i = 0; i < size / 2; i += 1) {
             ImGui::GetBackgroundDrawList()->AddQuadFilled(
-                *(ImVec2*)&top_points[i],
-                *(ImVec2*)&top_points[i + 1],
-                *(ImVec2*)&top_points[size - i - 1],
-                *(ImVec2*)&top_points[size - i],
+                top_points[i],
+                top_points[i + 1],
+                top_points[size - i - 1],
+                top_points[size - i],
                 color
             );
 
             ImGui::GetBackgroundDrawList()->AddQuadFilled(
-                *(ImVec2*)&bottom_points[i],
-                *(ImVec2*)&bottom_points[i + 1],
-                *(ImVec2*)&bottom_points[size - i - 1],
-                *(ImVec2*)&bottom_points[size - i],
+                bottom_points[i],
+                bottom_points[i + 1],
+                bottom_points[size - i - 1],
+                bottom_points[size - i],
                 color
             );
         }
@@ -166,14 +166,14 @@ cyl::bases _cylinder(
     if (outline) {
         for (int i = 0; i < size; i += 1) {
             ImGui::GetBackgroundDrawList()->AddLine(
-                *(ImVec2*)&top_points[i],
-                *(ImVec2*)&top_points[i + 1],
+                top_points[i],
+                top_points[i + 1],
                 color_outline
             );
 
             ImGui::GetBackgroundDrawList()->AddLine(
-                *(ImVec2*)&bottom_points[i],
-                *(ImVec2*)&bottom_points[i + 1],
+                bottom_points[i],
+                bottom_points[i + 1],
                 color_outline
             );
         }
@@ -214,47 +214,46 @@ void draw::ring(const Vector3f& start, const Vector3f& end, float radius_a, floa
 
     for (int i = 0; i < size; i += 1) {
         ImGui::GetBackgroundDrawList()->AddQuadFilled(
-            *(ImVec2*)&outer_top[i],
-            *(ImVec2*)&outer_top[i + 1],
-            *(ImVec2*)&inner_top[i + 1],
-            *(ImVec2*)&inner_top[i],
+            outer_top[i],
+            outer_top[i + 1],
+            inner_top[i + 1],
+            inner_top[i],
             color
         );
 
         ImGui::GetBackgroundDrawList()->AddQuadFilled(
-            *(ImVec2*)&outer_bottom[i],
-            *(ImVec2*)&outer_bottom[i + 1],
-            *(ImVec2*)&inner_bottom[i + 1],
-            *(ImVec2*)&inner_bottom[i],
+            outer_bottom[i],
+            outer_bottom[i + 1],
+            inner_bottom[i + 1],
+            inner_bottom[i],
             color
         );
     }
 }
 
-void draw::box(const Vector3f& pos, const Vector3f& extent, ImU32 color, bool outline, ImU32 color_outline) {
-    const auto min = pos - extent;
-    const auto max = pos + extent;
-    std::vector<ImVec2> corners(8);
-
+void draw::box(const Vector3f& pos, const Vector3f& extent, const Vector3f& euler, ImU32 color, bool outline, ImU32 color_outline) {
+    Matrix4x4f transform = glm::eulerAngleYXZ(euler.y, euler.x, euler.z);
+    std::vector<ImVec2> corners;
     std::vector<Vector3f> corners3f = {
-        Vector3f(min.x, min.y, min.z),
-        Vector3f(max.x, min.y, min.z),
-        Vector3f(max.x, max.y, min.z),
-        Vector3f(min.x, max.y, min.z),
-        Vector3f(min.x, max.y, max.z),
-        Vector3f(min.x, min.y, max.z),
-        Vector3f(max.x, min.y, max.z),
-        Vector3f(max.x, max.y, max.z)
+        extent * -1.0f,
+        Vector3f(extent.x, -extent.y, -extent.z),
+        Vector3f(extent.x, extent.y, -extent.z),
+        Vector3f(-extent.x, extent.y, -extent.z),
+        Vector3f(-extent.x, extent.y, extent.z),
+        Vector3f(-extent.x, -extent.y, extent.z),
+        Vector3f(extent.x, -extent.y, extent.z),
+        extent
     };
 
-    for (int i = 0; i <= 7; i++) {
-        auto corner = util::world_to_screen(corners3f[i]);
+    for (auto corner : corners3f) {
+        auto rot_corner = Vector3f(Vector4f(corner, 0) * transform);
+        auto corner = util::world_to_screen(pos + rot_corner);
 
         if (!corner) {
             return;
         }
 
-        corners[i] = *(ImVec2*)&*corner;
+        corners.push_back(*(ImVec2*)&*corner);
     }
 
     std::vector<std::vector<ImVec2>> quads = {
@@ -271,6 +270,87 @@ void draw::box(const Vector3f& pos, const Vector3f& extent, ImU32 color, bool ou
         ImGui::GetBackgroundDrawList()->PathLineTo(quad[1]);
         ImGui::GetBackgroundDrawList()->PathLineTo(quad[2]);
         ImGui::GetBackgroundDrawList()->PathLineTo(quad[3]);
+
+        if (outline) {
+            _fill_and_stroke(color, color_outline);
+        }
+        else {
+            ImGui::GetBackgroundDrawList()->PathFillConvex(color);
+        }
+    }
+}
+
+void draw::triangle(const Vector3f& pos, const Vector3f& extent, Vector3f& euler, ImU32 color, bool outline, ImU32 color_outline) {
+    euler = euler * -1.0f;
+    std::vector<Vector3f> tri_top = {
+        extent,
+        Vector3f(-extent.x, extent.y, extent.z),
+        Vector3f(0, extent.y, -extent.z)
+    };
+    std::vector<Vector3f> tri_bottom = {
+        Vector3f(extent.x, -extent.y, extent.z),
+        Vector3f(-extent.x, -extent.y, extent.z),
+        Vector3f(0, -extent.y, -extent.z)
+    };
+    Matrix4x4f transform = glm::eulerAngleYXZ(euler.y, euler.x, euler.z);
+
+    
+    auto get_screen_triangle = [&](std::vector<Vector3f> points) -> std::optional<std::vector<ImVec2>> {
+        std::vector<ImVec2> screen_points;
+
+        for (auto point : points) {
+            auto rot_point = Vector3f(Vector4f(point, 0) * transform);
+            auto opt = util::world_to_screen(pos + rot_point);
+
+            if (!opt) {
+                return std::nullopt;
+            }
+
+            screen_points.push_back(*(ImVec2*)&*opt);
+        }
+
+        return screen_points;
+    };
+
+    auto opt = get_screen_triangle(tri_top);
+
+    if (!opt) {
+        return;
+    }
+
+    auto screen_tri_top = *opt;
+    opt = get_screen_triangle(tri_bottom);
+
+    if (!opt) {
+        return;
+    }
+
+    auto screen_tri_bottom = *opt;
+
+    ImGui::GetBackgroundDrawList()->AddTriangleFilled(
+        screen_tri_top[0],
+        screen_tri_top[1],
+        screen_tri_top[2],
+        color
+    );
+    ImGui::GetBackgroundDrawList()->AddTriangleFilled(
+        screen_tri_bottom[0],
+        screen_tri_bottom[1],
+        screen_tri_bottom[2],
+        color
+    );
+
+    for (int i = 0; i < 3; i++) {
+        auto j = i + 1;
+
+        if (i == 2) {
+            j = 0;
+        }
+
+        ImGui::GetBackgroundDrawList()->PathLineTo(screen_tri_top[i]);
+        ImGui::GetBackgroundDrawList()->PathLineTo(screen_tri_top[j]);
+        ImGui::GetBackgroundDrawList()->PathLineTo(screen_tri_bottom[j]);
+        ImGui::GetBackgroundDrawList()->PathLineTo(screen_tri_bottom[i]);
 
         if (outline) {
             _fill_and_stroke(color, color_outline);
@@ -334,10 +414,10 @@ void draw::capsule_ellipse(const Vector3f& start, const Vector3f& end, float rad
 
         auto get_ellipse = [&](const Vector3f normal, const Vector2f start, float radius, float a_min, float a_max) {
 
-            auto elliptical_arc_to = [&](const Vector2f& center, float radius_x, float radius_y, float rot, float a_min, float a_max, int num_segments) -> std::vector<Vector2f> {
+            auto elliptical_arc_to = [&](const Vector2f& center, float radius_x, float radius_y, float rot, float a_min, float a_max, int num_segments) -> std::vector<ImVec2> {
                 const float cos_rot = std::cos(rot);
                 const float sin_rot = std::sin(rot);
-                std::vector<Vector2f> points;
+                std::vector<ImVec2> points;
 
                 for (int i = 0; i <= num_segments; i++) {
                     const float a = a_min + ((float)i / (float)num_segments) * (a_max - a_min);
@@ -348,7 +428,7 @@ void draw::capsule_ellipse(const Vector3f& start, const Vector3f& end, float rad
                     const float rel_y = (point.x * sin_rot) + (point.y * cos_rot);
                     point.x = rel_x + center.x;
                     point.y = rel_y + center.y;
-                    points.push_back(point);
+                    points.push_back(*(ImVec2*)&point);
                 }
 
                 return points;
@@ -366,10 +446,10 @@ void draw::capsule_ellipse(const Vector3f& start, const Vector3f& end, float rad
         // body
         for (int i = 0; i < size; i += 1) {
             ImGui::GetBackgroundDrawList()->AddQuadFilled(
-                *(ImVec2*)&top_points[i],
-                *(ImVec2*)&top_points[i + 1],
-                *(ImVec2*)&bottom_points[i + 1],
-                *(ImVec2*)&bottom_points[i],
+                top_points[i],
+                top_points[i + 1],
+                bottom_points[i + 1],
+                bottom_points[i],
                 color
             );
         }
@@ -378,14 +458,14 @@ void draw::capsule_ellipse(const Vector3f& start, const Vector3f& end, float rad
         if (outline) {
             for (int i = 0; i < size; i += 1) {
                 ImGui::GetBackgroundDrawList()->AddLine(
-                    *(ImVec2*)&top_points[i],
-                    *(ImVec2*)&top_points[i + 1],
+                    top_points[i],
+                    top_points[i + 1],
                     color_outline
                 );
 
                 ImGui::GetBackgroundDrawList()->AddLine(
-                    *(ImVec2*)&bottom_points[i],
-                    *(ImVec2*)&bottom_points[i + 1],
+                    bottom_points[i],
+                    bottom_points[i + 1],
                     color_outline
                 );
             }
@@ -443,23 +523,23 @@ void draw::capsule_quad(const Vector3f& start, const Vector3f& end, float radius
 
         // Draw a quad
         ImGui::GetBackgroundDrawList()->AddQuadFilled(
-            *(ImVec2*)&body.corners[0],
-            *(ImVec2*)&body.corners[1],
-            *(ImVec2*)&body.corners[2],
-            *(ImVec2*)&body.corners[3],
+            body.corners[0],
+            body.corners[1],
+            body.corners[2],
+            body.corners[3],
             color
         );
 
         if (outline) {
             ImGui::GetBackgroundDrawList()->AddLine(
-                *(ImVec2*)&body.corners[0],
-                *(ImVec2*)&body.corners[3],
+                body.corners[0],
+                body.corners[3],
                 color_outline
             );
 
             ImGui::GetBackgroundDrawList()->AddLine(
-                *(ImVec2*)&body.corners[1],
-                *(ImVec2*)&body.corners[2],
+                body.corners[1],
+                body.corners[2],
                 color_outline
             );
         }

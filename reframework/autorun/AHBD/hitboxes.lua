@@ -183,7 +183,7 @@ function hitboxes.get()
                 goto continue
             end
 
-            local phase = attack.attack_work['<Phase>k__BackingField']
+            local phase = attack.attack_work:read_byte(0x10) --attack.attack_work['<Phase>k__BackingField']
 
             if (
                 phase == 3

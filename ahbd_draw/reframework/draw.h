@@ -36,6 +36,8 @@ namespace draw {
 	void sphere(const Vector3f& center, float radius, ImU32 color, bool outline, ImU32 color_outline);
 	void cylinder(const Vector3f& start, const Vector3f& end, float radius, ImU32 color, bool outline, ImU32 color_outline);
 	void ring(const Vector3f& start, const Vector3f& end, float radius_a, float radius_b, ImU32 color, bool outline, ImU32 color_outline);
-	void box(const Vector3f& pos, const Vector3f& extent, const Vector3f& euler, ImU32 color, bool outline, ImU32 color_outline);
-	void triangle(const Vector3f& pos, const Vector3f& extent, Vector3f& euler, ImU32 color, bool outline, ImU32 color_outline);
+	void box(const Vector3f& pos, const Vector3f& extent, const Matrix4x4f& rot, ImU32 color, bool outline, ImU32 color_outline);
+	void box(const Vector3f& pos, const Vector3f& extent, const Vector3f& rot, ImU32 color, bool outline, ImU32 color_outline);
+	void triangle(const Vector3f& pos, const Vector3f& extent, const Matrix4x4f& rot, ImU32 color, bool outline, ImU32 color_outline);
+	void triangle(const Vector3f& pos, const Vector3f& extent, const Vector3f& rot, ImU32 color, bool outline, ImU32 color_outline);
 }

@@ -12,6 +12,7 @@
 #include <glm/gtx/matrix_major_storage.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/vector_angle.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 using Vector2f = glm::vec2;
 using Vector3f = glm::vec3;

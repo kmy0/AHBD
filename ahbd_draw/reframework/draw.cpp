@@ -231,8 +231,7 @@ void draw::ring(const Vector3f& start, const Vector3f& end, float radius_a, floa
     }
 }
 
-void draw::box(const Vector3f& pos, const Vector3f& extent, const Vector3f& euler, ImU32 color, bool outline, ImU32 color_outline) {
-    Matrix4x4f transform = glm::eulerAngleYXZ(euler.y, euler.x, euler.z);
+void draw::box(const Vector3f& pos, const Vector3f& extent, const Matrix4x4f& rot, ImU32 color, bool outline, ImU32 color_outline) {
     std::vector<ImVec2> corners;
     std::vector<Vector3f> corners3f = {
         extent * -1.0f,
@@ -246,7 +245,7 @@ void draw::box(const Vector3f& pos, const Vector3f& extent, const Vector3f& eule
     };
 
     for (auto corner : corners3f) {
-        auto rot_corner = Vector3f(Vector4f(corner, 0) * transform);
+        auto rot_corner = Vector3f(Vector4f(corner, 0) * rot);
         auto corner = util::world_to_screen(pos + rot_corner);
 
         if (!corner) {
@@ -261,8 +260,8 @@ void draw::box(const Vector3f& pos, const Vector3f& extent, const Vector3f& eule
         {corners[0], corners[3], corners[4], corners[5]},
         {corners[0], corners[1], corners[6], corners[5]},
         {corners[1], corners[2], corners[7], corners[6]},
-        {corners[2], corners[3], corners[4], corners[7]}, 
-        {corners[4], corners[5], corners[6], corners[7]} 
+        {corners[2], corners[3], corners[4], corners[7]},
+        {corners[4], corners[5], corners[6], corners[7]}
     };
 
     for (auto quad : quads) {
@@ -280,21 +279,24 @@ void draw::box(const Vector3f& pos, const Vector3f& extent, const Vector3f& eule
     }
 }
 
-void draw::triangle(const Vector3f& pos, const Vector3f& extent, Vector3f& euler, ImU32 color, bool outline, ImU32 color_outline) {
-    euler = euler * -1.0f;
+void draw::box(const Vector3f& pos, const Vector3f& extent, const Vector3f& rot, ImU32 color, bool outline, ImU32 color_outline) {
+    Matrix4x4f transform = glm::eulerAngleYXZ(rot.y, rot.x, rot.z);
+    box(pos, extent, transform, color, outline, color_outline);
+}
+
+void draw::triangle(const Vector3f& pos, const Vector3f& extent, const Matrix4x4f& rot, ImU32 color, bool outline, ImU32 color_outline) {
+    Matrix4x4f transform = glm::inverse(rot);
     std::vector<Vector3f> tri_top = {
-        extent,
-        Vector3f(-extent.x, extent.y, extent.z),
-        Vector3f(0, extent.y, -extent.z)
+         extent,
+         Vector3f(-extent.x, extent.y, extent.z),
+         Vector3f(0, extent.y, -extent.z)
     };
     std::vector<Vector3f> tri_bottom = {
         Vector3f(extent.x, -extent.y, extent.z),
         Vector3f(-extent.x, -extent.y, extent.z),
         Vector3f(0, -extent.y, -extent.z)
     };
-    Matrix4x4f transform = glm::eulerAngleYXZ(euler.y, euler.x, euler.z);
 
-    
     auto get_screen_triangle = [&](std::vector<Vector3f> points) -> std::optional<std::vector<ImVec2>> {
         std::vector<ImVec2> screen_points;
 
@@ -359,6 +361,11 @@ void draw::triangle(const Vector3f& pos, const Vector3f& extent, Vector3f& euler
             ImGui::GetBackgroundDrawList()->PathFillConvex(color);
         }
     }
+}
+
+void draw::triangle(const Vector3f& pos, const Vector3f& extent, const Vector3f& rot, ImU32 color, bool outline, ImU32 color_outline) {
+    Matrix4x4f transform = glm::eulerAngleYXZ(rot.y, rot.x, rot.z);
+    triangle(pos, extent, transform, color, outline, color_outline);
 }
 
 void draw::sphere(const Vector3f& center, float radius, ImU32 color, bool outline, ImU32 color_outline) {

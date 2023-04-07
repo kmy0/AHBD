@@ -226,7 +226,7 @@ function utilities.check_custom_shape(collidable, userdata)
 
         return true, custom_shape_type
     else
-        shape_type = collidable.shape:get_ShapeType() --collidable.shape:read_byte(0x20)
+        shape_type = collidable.shape:read_byte(0x20) --collidable.shape:get_ShapeType()
         -- if not misc.table_contains(data.valid_shapes, shape_type) then
         --     if not misc.table_contains(config.current.missing_shapes, shape_type) then
         --         table.insert(config.current.missing_shapes, shape_type)
@@ -238,61 +238,65 @@ function utilities.check_custom_shape(collidable, userdata)
 end
 
 function utilities.update_collidable(collidable)
-    collidable.enabled = collidable.col:get_Enabled() --collidable.col:read_byte(0x10) == 3
+    collidable.enabled = collidable.col:read_byte(0x10) ~= 0 --collidable.col:get_Enabled()
 
     if collidable.enabled then
-
         local shape = collidable.shape
+
         if shape then
-            if collidable.info.shape_type then
-                if collidable.info.shape_type == 3 or collidable.info.shape_type == 4 then --Capsule, ContinuousCapsule
+            if (
+                collidable.info.shape_type == 3             --Capsule
+                or collidable.info.shape_type == 4          --ContinuousCapsule
+                or collidable.info.custom_shape_type == 1   --Cylinder
+                or collidable.info.custom_shape_type == 4   --Donut
+            ) then
 
-                    shape = shape:get_Capsule()
-                    collidable.pos_a = shape.p0
-                    collidable.pos_b = shape.p1
-                    collidable.radius = shape.r
-                    collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
+                collidable.pos_a = Vector3f.new(shape:read_float(0x60), shape:read_float(100), shape:read_float(0x68))
+                collidable.pos_b = Vector3f.new(shape:read_float(0x70), shape:read_float(0x74), shape:read_float(0x78))
+                collidable.radius = shape:read_float(0x80)
 
-                elseif collidable.info.shape_type == 1 or collidable.info.shape_type == 2 then --Sphere, ContinuousSphere
+                -- shape = shape:get_Capsule()
+                -- collidable.pos_a = shape.p0
+                -- collidable.pos_b = shape.p1
+                -- collidable.radius = shape.r
 
-                    shape = shape:get_Sphere()
-                    collidable.radius = shape.r
-                    collidable.pos = shape.pos
-
-                elseif collidable.info.shape_type == 5 then --Box
-
-                    shape = shape:get_Box()
-                    collidable.pos = shape:get_Position()
-                    collidable.rot = shape:get_RotateAngle()
-                    collidable.extent = shape.extent
-
+                if collidable.info.custom_shape_type == 4 then
+                    collidable.ring_radius = collidable.info.userdata:read_float(0x44)
                 end
-            else
-                if collidable.info.custom_shape_type == 1 then --Cylinder
 
-                    shape = shape:get_Capsule()
-                    collidable.pos_a = shape.p0
-                    collidable.pos_b = shape.p1
-                    collidable.radius = shape.r
-                    collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
+                collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
 
-                elseif collidable.info.custom_shape_type == 3 then --TrianglePole
+            elseif (
+                    collidable.info.shape_type == 1         --Sphere
+                    or collidable.info.shape_type == 2      --ContinuousSphere
+            ) then
 
-                    shape = shape:get_Box()
-                    collidable.pos = shape:get_Position()
-                    collidable.rot = shape:get_RotateAngle()
-                    collidable.extent = shape.extent
+                collidable.pos = Vector3f.new(shape:read_float(0x60), shape:read_float(0x64), shape:read_float(0x68))
+                collidable.radius = shape:read_float(0x6c)
 
-                elseif collidable.info.custom_shape_type == 4 then --Donut
+                -- shape = shape:get_Sphere()
+                -- collidable.radius = shape.r
+                -- collidable.pos = shape.pos
 
-                    shape = shape:get_Capsule()
-                    collidable.pos_a = shape.p0
-                    collidable.pos_b = shape.p1
-                    collidable.radius = shape.r
-                    collidable.ring_radius = collidable.info.userdata._RingRadius
-                    collidable.pos = (collidable.pos_a + collidable.pos_b) * 0.5
+            elseif (
+                    collidable.info.shape_type == 5             --Box
+                    or collidable.info.custom_shape_type == 3   --TrianglePole
+            ) then
 
-                end
+                collidable.pos = Vector3f.new(shape:read_float(0x90), shape:read_float(0x94), shape:read_float(0x98))
+                collidable.extent = Vector3f.new(shape:read_float(0xa0), shape:read_float(0xa4), shape:read_float(0xa8))
+                collidable.rot = Matrix4x4f.new(
+                    shape:read_float(0x60), shape:read_float(0x100), shape:read_float(0x68), shape:read_float(0x6c),
+                    shape:read_float(0x70), shape:read_float(0x74), shape:read_float(0x78), shape:read_float(0x7c),
+                    shape:read_float(0x80), shape:read_float(0x84), shape:read_float(0x88), shape:read_float(0x8c),
+                    collidable.pos.x, collidable.pos.y, collidable.pos.z, shape:read_float(0x9c)
+                )
+
+                -- shape = shape:get_Box()
+                -- collidable.pos = shape:get_Position()
+                -- collidable.rot = shape:get_RotateAngle()    --euler
+                -- collidable.extent = shape.extent
+
             end
 
             collidable.distance = (data.master_player.pos - collidable.pos):length()

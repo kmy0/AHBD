@@ -107,8 +107,22 @@ void on_lua_state_created(lua_State* l) {
     ahbd_draw["end_frame"] = end_frame;
     ahbd_draw["cylinder"] = draw::cylinder;
     ahbd_draw["ring"] = draw::ring;
-    ahbd_draw["box"] = draw::box;
-    ahbd_draw["triangle"] = draw::triangle;
+    ahbd_draw["box"] = sol::overload(
+        [](const Vector3f& pos, const Vector3f& extent, const Matrix4x4f& rot, ImU32 color, bool outline, ImU32 color_outline) {
+            draw::box(pos, extent, rot, color, outline, color_outline);
+        },
+        [](const Vector3f& pos, const Vector3f& extent, const Vector3f& rot, ImU32 color, bool outline, ImU32 color_outline) {
+            draw::box(pos, extent, rot, color, outline, color_outline);
+        }
+    );
+    ahbd_draw["triangle"] = sol::overload(
+        [](const Vector3f& pos, const Vector3f& extent, const Matrix4x4f& rot, ImU32 color, bool outline, ImU32 color_outline) {
+            draw::triangle(pos, extent, rot, color, outline, color_outline);
+        },
+        [](const Vector3f& pos, const Vector3f& extent, const Vector3f& rot, ImU32 color, bool outline, ImU32 color_outline) {
+            draw::triangle(pos, extent, rot, color, outline, color_outline);
+        }
+     );
     ahbd_draw["capsule_ellipse"] = draw::capsule_ellipse;
     ahbd_draw["capsule_quad"] = draw::capsule_quad;
     ahbd_draw["sphere"] = draw::sphere;

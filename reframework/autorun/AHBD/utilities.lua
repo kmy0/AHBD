@@ -214,7 +214,7 @@ function utilities.update_objects()
 end
 
 function utilities.check_custom_shape(collidable, userdata)
-    local custom_shape_type = userdata._CustomShapeType
+    local custom_shape_type = userdata:read_byte(0xa0) --userdata._CustomShapeType
     local shape_type
 
     if custom_shape_type and custom_shape_type ~= 0 then

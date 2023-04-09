@@ -19,6 +19,7 @@ local function create_hurtbox_monitor_entry(name, internal_name, parent, meat, p
             highlight=false,
             meat=meat,
             part_name=utilities.get_part_name(meat, parent.id) or internal_name or "???",
+            break_data=parent.base['<RefEmUserData>k__BackingField']._tuneData:getPartsGroupBreakData(part_group),
             internal_name=internal_name,
             part_group=part_group,
             collidables={}

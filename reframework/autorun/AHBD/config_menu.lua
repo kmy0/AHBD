@@ -91,6 +91,7 @@ local table_2 = {
         'Part Name',
         'Visible',
         'Highlight',
+        'Breakable',
         'Hurtbox Count',
         'Shapes',
         'Slash',
@@ -450,6 +451,8 @@ local function draw_hurtbox_monitor()
                                     imgui.text(count)
                                 elseif header == 'Shapes' then
                                     imgui.text(misc.join_table(shape_count))
+                                elseif header == 'Breakable' then
+                                    imgui.text(group.break_data and "Yes" or "No")
                                 else
                                     imgui.text(group.hitzones[table_2.header_to_key[header]])
                                 end

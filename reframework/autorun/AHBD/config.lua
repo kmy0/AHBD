@@ -37,6 +37,7 @@ config.default = {
     HitOnWall_color=1007118233,
     NoHitDuringWire_color=1006632960,
     NoHitInAirForPlayer_color=1012356998,
+    HitFloatingPlayer_color=1011830610,
 
     ignore_hurtbox_smallenemy=false,
     ignore_hurtbox_bossenemy=false,
@@ -66,9 +67,7 @@ config.default = {
     hide_when_invulnerable=false,
 
     table_size=25,
-    -- missing_shapes={},
-    -- missing_custom_shapes={},
-    hitzone_conditions={},
+    hitzone_conditions={}
 }
 config.current = {}
 config.version = '1.1.3'

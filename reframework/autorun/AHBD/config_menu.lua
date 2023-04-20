@@ -495,15 +495,6 @@ function config_menu.draw()
     imgui.spacing()
     imgui.indent(10)
 
-    -- local string_1 = table.concat(config.current.missing_shapes, ", ")
-    -- local string_2 = table.concat(config.current.missing_custom_shapes, ", ")
-    -- if string_1 ~= '' then
-    --     imgui.text('Missing Shape Types: ' .. string_1)
-    -- end
-    -- if string_2 ~= '' then
-    --     imgui.text('Missing Custom Shape Types: ' .. string_2)
-    -- end
-
     local changed
     _, config.current.enabled = imgui.checkbox('Draw Hitboxes', config.current.enabled)
     changed, config.current.enabled_hurtboxes = imgui.checkbox('Draw Hurtboxes', config.current.enabled_hurtboxes)

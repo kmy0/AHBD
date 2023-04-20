@@ -66,6 +66,10 @@ local function get_fields(type_def, write_to_config, t, write_color, ignore)
 
                 if write_color then
                     config.default['enable_' .. name .. '_color'] = true
+
+                    if not config.default[name .. '_color'] then
+                         config.default[name .. '_color'] = 1020343074
+                    end
                 end
 
                 t.names[name] = data

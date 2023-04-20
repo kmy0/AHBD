@@ -218,21 +218,9 @@ function utilities.check_custom_shape(collidable, userdata)
     local shape_type
 
     if custom_shape_type and custom_shape_type ~= 0 then
-        -- if not misc.table_contains(data.valid_custom_shapes, custom_shape_type) then
-        --     if not misc.table_contains(config.current.missing_custom_shapes, custom_shape_type) then
-        --         table.insert(config.current.missing_custom_shapes, custom_shape_type)
-        --     end
-        -- end
-
         return true, custom_shape_type
     else
         shape_type = collidable.shape:read_byte(0x20) --collidable.shape:get_ShapeType()
-        -- if not misc.table_contains(data.valid_shapes, shape_type) then
-        --     if not misc.table_contains(config.current.missing_shapes, shape_type) then
-        --         table.insert(config.current.missing_shapes, shape_type)
-        --     end
-        -- end
-
         return false, shape_type
     end
 end

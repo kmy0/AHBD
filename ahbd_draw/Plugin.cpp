@@ -13,6 +13,8 @@
 
 #include <reframework/API.hpp>
 
+#include <mutex>
+
 
 using API = reframework::API;
 
@@ -20,6 +22,7 @@ lua_State* g_lua{ nullptr };
 HWND g_wnd{};
 bool g_initialized{ false };
 bool g_draw{ false };
+std::mutex g_mutex;
 
 
 bool initialize_imgui() {
@@ -59,6 +62,7 @@ bool initialize_imgui() {
 }
 
 bool start_frame() {
+    std::lock_guard _{ g_mutex };
     if (!g_initialized) {
         if (!initialize_imgui()) {
             return false;
@@ -92,6 +96,7 @@ bool start_frame() {
 }
 
 void end_frame() {
+    std::lock_guard _{ g_mutex };
     ImGui::EndFrame();
     g_draw = true;
 }
@@ -136,6 +141,7 @@ void on_lua_state_destroyed(lua_State* l) {
 }
 
 void on_frame() {
+    std::lock_guard _{ g_mutex };
     if (g_draw) {
         const auto renderer_data = API::get()->param()->renderer_data;
 

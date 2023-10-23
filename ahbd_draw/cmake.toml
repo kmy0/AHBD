@@ -1,0 +1,47 @@
+# Reference: https://build-cpp.github.io/cmkr/cmake-toml
+# to build:
+# > cmake -B build
+# > cmake --build build --config Release
+[project]
+name = "ahbd_draw"
+
+[target.imgui]
+type = "interface"
+sources = ["dependencies/imgui/*.cpp"]
+include-directories = ["dependencies/imgui"]
+
+[target.sol2]
+type = "interface"
+include-directories = ["dependencies/sol2/include"]
+
+[target.lua]
+type = "static"
+sources = ["dependencies/lua/*.c"]
+include-directories = ["dependencies/lua"]
+
+[target.glm]
+type = "interface"
+sources = ["dependencies/glm/glm/**.cpp"]
+include-directories = ["dependencies/glm"]
+
+[target.ahdb_draw]
+type = "shared"
+sources = ["src/**.cpp"]
+headers = ["src/**.hpp", "src/**.h"]
+link-libraries = [
+    "lua",
+    "sol2",
+    "imgui",
+    "glm",
+    "d3d11",
+    "d3d12",
+    "d3dcompiler",
+    "dxgi"
+]
+cmake-after= """
+set_target_properties(ahdb_draw PROPERTIES
+                      RUNTIME_OUTPUT_DIRECTORY_RELEASE ../bin
+)
+"""
+
+compile-features = ["cxx_std_20"]

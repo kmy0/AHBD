@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+/.vscode
+/AHBD.code-workspace
+ahbd_draw/build/
+/ahbd_draw/bin

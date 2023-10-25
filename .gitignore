@@ -34,3 +34,6 @@
 /AHBD.code-workspace
 ahbd_draw/build/
 /ahbd_draw/bin
+/compile_commands.json
+/.clang-format
+/ahbd_draw/.cache

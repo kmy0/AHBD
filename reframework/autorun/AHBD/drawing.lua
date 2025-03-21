@@ -8,32 +8,19 @@ local function draw_shape(collidable)
     if collidable.info.shape_type then
         if collidable.info.shape_type == 3 or collidable.info.shape_type == 4 then --Capsule
 
-            if config.current.capsule_body == 2 then
+            hb_draw.capsule(
+                collidable.pos_a,
+                collidable.pos_b,
+                collidable.radius,
+                collidable.color,
+                config.current.show_outline,
+                config.current.outline_color
+            )
 
-                ahbd_draw.capsule_quad(
-                    collidable.pos_a,
-                    collidable.pos_b,
-                    collidable.radius,
-                    collidable.color,
-                    config.current.show_outline,
-                    config.current.outline_color
-                )
 
-            else
-
-                ahbd_draw.capsule_ellipse(
-                    collidable.pos_a,
-                    collidable.pos_b,
-                    collidable.radius,
-                    collidable.color,
-                    config.current.show_outline,
-                    config.current.outline_color
-                )
-
-            end
         elseif collidable.info.shape_type == 1 or collidable.info.shape_type == 2 then --Sphere
 
-            ahbd_draw.sphere(
+            hb_draw.sphere(
                 collidable.pos,
                 collidable.radius,
                 collidable.color,
@@ -43,7 +30,7 @@ local function draw_shape(collidable)
 
         elseif collidable.info.shape_type == 5 then --Box
 
-            ahbd_draw.box(
+            hb_draw.box(
                 collidable.pos,
                 collidable.extent,
                 collidable.rot,
@@ -56,7 +43,7 @@ local function draw_shape(collidable)
     else
         if collidable.info.custom_shape_type == 1 then --Cylinder
 
-            ahbd_draw.cylinder(
+            hb_draw.cylinder(
                 collidable.pos_a,
                 collidable.pos_b,
                 collidable.radius,
@@ -68,7 +55,7 @@ local function draw_shape(collidable)
 
         elseif collidable.info.custom_shape_type == 3 then --TrianglePole
 
-            ahbd_draw.triangle(
+            hb_draw.triangle(
                 collidable.pos,
                 collidable.extent,
                 collidable.rot,
@@ -79,7 +66,7 @@ local function draw_shape(collidable)
 
         elseif collidable.info.custom_shape_type == 4 then --Donut
 
-            ahbd_draw.ring(
+            hb_draw.ring(
                 collidable.pos_a,
                 collidable.pos_b,
                 collidable.radius,
@@ -111,7 +98,7 @@ function drawing.draw()
         end
     )
 
-    if #drawing.cache > 0 and ahbd_draw.start_frame() then
+    if #drawing.cache > 0 then
 
         for i=1, #drawing.cache do
             local col = drawing.cache[i]
@@ -119,7 +106,6 @@ function drawing.draw()
             draw_shape(col)
         end
 
-        ahbd_draw.end_frame()
         drawing.cache = {}
     else
         drawing.cache = {}

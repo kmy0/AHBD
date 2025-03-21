@@ -56,7 +56,6 @@ config.default = {
     draw_distance=100,
     ignore_duplicate_hitboxes=false,
     show_outline=true,
-    capsule_body=1,
     hitbox_use_single_color=false,
     hurtbox_use_single_color=false,
     color=1020343074,
@@ -70,7 +69,7 @@ config.default = {
     hitzone_conditions={}
 }
 config.current = {}
-config.version = '1.1.4'
+config.version = '1.1.5'
 config.name = 'AHBD'
 config.config_path = config.name .. '/config.json'
 config.max_table_size = 1000

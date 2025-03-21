@@ -15,7 +15,6 @@ local window = {
     pivot=Vector2f.new(0, 0),
     size=Vector2f.new(800, 700),
     condition=1 << 3,
-    font=nil
 }
 local attack_monitor = {
     flags=0,
@@ -307,10 +306,6 @@ local function draw_attack_monitor()
                 if col == 0 then
                     imgui.text(row+1)
                 else
-                    if header == 'Attack Name' then
-                        imgui.push_font(window.font)
-                    end
-
                     local key = table_.header_to_key[header]
                     local value
 
@@ -322,10 +317,6 @@ local function draw_attack_monitor()
                     end
 
                     imgui.text(value)
-
-                    if header == 'Attack Name' then
-                        imgui.pop_font()
-                    end
                 end
             end
         end
@@ -415,9 +406,7 @@ local function draw_hurtbox_monitor()
                                 imgui.table_set_column_index(col)
 
                                 if header == 'Part Name' then
-                                    imgui.push_font(window.font)
                                     imgui.text(group.part_name)
-                                    imgui.pop_font()
                                 elseif header == 'Visible' then
                                     imgui.spacing()
 
@@ -474,10 +463,6 @@ local function draw_hurtbox_monitor()
 end
 
 function config_menu.draw()
-    if not window.font then
-        window.font = imgui.load_font('NotoSansJP-Bold.otf', imgui.get_default_font_size(), {0x1, 0xFFFF, 0})
-    end
-
     imgui.set_next_window_pos(window.pos, window.condition, window.pivot)
     imgui.set_next_window_size(window.size, window.condition)
     imgui.push_style_var(11, 5.0) -- Rounded elements
@@ -721,11 +706,6 @@ function config_menu.draw()
         _, config.current.show_outline = imgui.checkbox('Show Outline', config.current.show_outline)
         _, config.current.ignore_duplicate_hitboxes = imgui.checkbox('Ignore Duplicate Hitboxes', config.current.ignore_duplicate_hitboxes)
         set_tooltip('Some attacks load the same hitboxes more than once\nYou can ignore them to save on some performance', true)
-
-        if imgui.tree_node('Capsule') then
-            _, config.current.capsule_body = imgui.combo('Body', config.current.capsule_body, {'Ellipse', 'Quad'})
-            imgui.tree_pop()
-        end
 
         if imgui.tree_node('Colors') then
             _, config.current.outline_color = imgui.color_edit('Outline', config.current.outline_color)

@@ -1,0 +1,3 @@
+[submodule "deps/hb_draw"]
+	path = deps/hb_draw
+	url = https://github.com/kmy0/hb_draw.git

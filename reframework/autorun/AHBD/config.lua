@@ -69,7 +69,7 @@ config.default = {
     hitzone_conditions={}
 }
 config.current = {}
-config.version = '1.1.5'
+config.version = '1.1.6'
 config.name = 'AHBD'
 config.config_path = config.name .. '/config.json'
 config.max_table_size = 1000

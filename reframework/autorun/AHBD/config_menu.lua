@@ -465,13 +465,10 @@ end
 function config_menu.draw()
     imgui.set_next_window_pos(window.pos, window.condition, window.pivot)
     imgui.set_next_window_size(window.size, window.condition)
-    imgui.push_style_var(11, 5.0) -- Rounded elements
-    imgui.push_style_var(2, 10.0) -- Window Padding
 
     config_menu.is_opened = imgui.begin_window(string.format("%s %s", config.name, config.version), config_menu.is_opened , window.flags)
 
     if not config_menu.is_opened then
-        imgui.pop_style_var(2)
         imgui.end_window()
         config.save()
         return
@@ -874,7 +871,6 @@ function config_menu.draw()
         set_tooltip('Information about big monster hurtboxes')
     end
 
-    imgui.pop_style_var(2)
     imgui.end_window()
 end
 
